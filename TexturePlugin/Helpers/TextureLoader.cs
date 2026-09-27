@@ -363,13 +363,21 @@ public class TextureLoader
         return atlasNameLookup;
     }
 
-    public static Bitmap? GetTexture2DBitmap(Workspace workspace, AssetInst asset, out TextureFormat format)
+    public static Bitmap? GetTexture2DBitmap(Workspace workspace, AssetInst asset, out TextureFormat format, bool showSwizzled = false)
     {
         var textureEditBf = TextureHelper.GetByteArrayTexture(workspace, asset);
         var texture = TextureFile.ReadTextureFile(textureEditBf);
         format = (TextureFormat)texture.m_TextureFormat;
 
         TextureHelper.SwizzleOptIn(texture, asset.FileInstance.file);
+
+        if (showSwizzled)
+        {
+            // Decode stored order directly on this temporary TextureFile only.
+            if (texture.swizzleType == SwizzleType.Switch)
+                texture.m_TextureFormat = (int)SwitchSwizzle.GetCorrectedSwitchTextureFormat(format);
+            texture.swizzleType = SwizzleType.None;
+        }
 
         var encTextureData = texture.FillPictureData(asset.FileInstance);
         // rare, but sometimes we see large textures with 0 texture data size

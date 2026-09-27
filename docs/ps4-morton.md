@@ -9,6 +9,12 @@ and Texture2D `m_IsPreProcessed = true`. A missing or false flag retains the
 standard linear path. PS4 does not require a nonempty `m_PlatformBlob`.
 Switch selection still requires its original platform blob.
 
+The Texture2D preview shows **Show original swizzled texture** above the
+image when console swizzling is detected. Checking it bypasses deswizzling
+for the preview only, showing stored block/pixel order at the logical image
+dimensions. It does not change texture bytes, preprocessing flags or exports.
+Selecting another asset resets the checkbox to the normal decoded view.
+
 The block size comes from `m_TextureFormat`, not from PNG dimensions:
 
 | Formats | Element size | Bytes per element |

@@ -8,7 +8,7 @@ using UABEANext4.Logic.Mesh;
 using UABEANext4.Plugins;
 
 namespace TexturePlugin;
-public class TexturePreviewer : IUavPluginPreviewer
+public class TexturePreviewer : IUavPluginPreviewer, IUavRawTexturePreviewer
 {
     public string Name => "Preview Texture2D";
     public string Description => "Preview Texture2Ds";
@@ -23,10 +23,22 @@ public class TexturePreviewer : IUavPluginPreviewer
     }
 
     public (Bitmap?, int) ExecuteImage(Workspace workspace, IUavPluginFunctions funcs, AssetInst selection, out string? error)
+        => ExecuteImage(workspace, funcs, selection, false, out error);
+
+    public bool SupportsRawPreview(Workspace workspace, AssetInst asset)
+    {
+        var field = TextureHelper.GetByteArrayTexture(workspace, asset);
+        if (field == null) return false;
+        var texture = TextureFile.ReadTextureFile(field);
+        return TexturePlatform.GetSwizzleType(texture, asset.FileInstance.file.Metadata.TargetPlatform) != SwizzleType.None;
+    }
+
+    public (Bitmap?, int) ExecuteImage(Workspace workspace, IUavPluginFunctions funcs, AssetInst selection,
+        bool showSwizzled, out string? error)
     {
         try
         {
-            var image = TextureLoader.GetTexture2DBitmap(workspace, selection, out TextureFormat format);
+            var image = TextureLoader.GetTexture2DBitmap(workspace, selection, out TextureFormat format, showSwizzled);
             if (image != null)
             {
                 error = null;

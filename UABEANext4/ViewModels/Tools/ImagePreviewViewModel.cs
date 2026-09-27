@@ -23,6 +23,43 @@ public partial class ImagePreviewViewModel : ViewModelBase
     [ObservableProperty]
     private string _currentBgLabel = "A";
 
+    [ObservableProperty]
+    private bool _canShowSwizzled;
+    [ObservableProperty]
+    private bool _showSwizzled;
+    [ObservableProperty]
+    private string? _previewError;
+
+    private Func<bool, (Bitmap? Image, int Format, string? Error)>? _texturePreview;
+
+    public void ConfigureTexturePreview(Func<bool, (Bitmap?, int, string?)>? preview)
+    {
+        _texturePreview = null;
+        ShowSwizzled = false;
+        PreviewError = null;
+        CanShowSwizzled = preview != null;
+        _texturePreview = preview;
+        if (preview != null) ReloadTexturePreview();
+    }
+
+    partial void OnShowSwizzledChanged(bool value) => ReloadTexturePreview();
+
+    private void ReloadTexturePreview()
+    {
+        if (_texturePreview == null) return;
+        try
+        {
+            var (image, format, error) = _texturePreview(ShowSwizzled);
+            UpdateImage(image, (AssetsTools.NET.Texture.TextureFormat)format);
+            PreviewError = image == null ? error ?? "Texture preview failed." : null;
+        }
+        catch (Exception ex)
+        {
+            UpdateImage(null, null);
+            PreviewError = ex.Message;
+        }
+    }
+
     private readonly string[] _bgLabels = ["A", "C", "B", "W", "G"];
     public double ZoomLevelY => -ZoomLevel;
     public double DisplayWidth => Image != null ? Image.PixelSize.Width * ZoomLevel : 0;
@@ -60,6 +97,8 @@ public partial class ImagePreviewViewModel : ViewModelBase
         }
 
         Image = bitmap;
+        OnPropertyChanged(nameof(DisplayWidth));
+        OnPropertyChanged(nameof(DisplayHeight));
         if (bitmap != null)
         {
             ImageInfo = $"{bitmap.PixelSize.Width} x {bitmap.PixelSize.Height} px";

@@ -73,6 +73,8 @@ public partial class PreviewerToolViewModel : Tool
 
     private void HandleAssetPreview(AssetInst? asset)
     {
+        ImagePreview.ConfigureTexturePreview(null);
+        ImagePreview.UpdateImage(null, null);
         if (asset is null)
         {
             SetDisplayText(string.Empty);
@@ -95,6 +97,17 @@ public partial class PreviewerToolViewModel : Tool
             case UavPluginPreviewerType.Image:
             {
                 ActivePreviewType = PreviewerToolPreviewType.Image;
+
+                if (prev is IUavRawTexturePreviewer rawPreviewer && rawPreviewer.SupportsRawPreview(Workspace, asset))
+                {
+                    ImagePreview.ConfigureTexturePreview(showSwizzled =>
+                    {
+                        var (bitmap, textureFormat) = rawPreviewer.ExecuteImage(Workspace, _uavPluginFuncs.Value,
+                            asset, showSwizzled, out var previewError);
+                        return (bitmap, textureFormat, previewError);
+                    });
+                    break;
+                }
 
                 var (image, format) = prev.ExecuteImage(Workspace, _uavPluginFuncs.Value, asset, out string? error);
                 if (image != null)
