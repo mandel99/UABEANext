@@ -52,6 +52,27 @@ public class EditTextureOption : IUavPluginOption
 
             var tex = TextureFile.ReadTextureFile(baseField);
             TextureHelper.SwizzleOptIn(tex, asset.FileInstance.file);
+            bool preprocessingChanged = editTexSettings.IsPreProcessed is bool requested && requested != tex.m_IsPreProcessed;
+
+            if (editTexSettings.IsPreProcessed is bool preprocessed && preprocessed != tex.m_IsPreProcessed)
+            {
+                try
+                {
+                    if (baseField["m_IsPreProcessed"].IsDummy)
+                        throw new NotSupportedException("This texture has no m_IsPreProcessed field.");
+                    if (singleTextureEdit
+                        || (editTexSettings.TextureFormat is not null && (int)editTexSettings.TextureFormat != tex.m_TextureFormat)
+                        || (editTexSettings.UsingMips is not null && editTexSettings.UsingMips != tex.m_MipMap))
+                        throw new NotSupportedException("Apply preprocessing conversion separately from image replacement, format or mip changes.");
+                    tex.FillPictureData(asset.FileInstance);
+                    TexturePlatform.SetPreprocessed(tex, asset.FileInstance.file.Metadata.TargetPlatform, preprocessed);
+                }
+                catch (Exception ex)
+                {
+                    errorBuilder.AppendLine($"[{errorAssetName}]: {ex.Message}");
+                    continue;
+                }
+            }
 
             if (tex.swizzleType == SwizzleType.PS4)
             {
@@ -67,7 +88,7 @@ public class EditTextureOption : IUavPluginOption
             byte[]? texOrigDecBytes = null;
             // single texture edit _replaces_ the original, so no
             // need to try and decompress the original texture.
-            if (!singleTextureEdit)
+            if (!singleTextureEdit && !preprocessingChanged)
             {
                 var needToReencode = false;
                 if (editTexSettings.TextureFormat is not null)
@@ -102,7 +123,7 @@ public class EditTextureOption : IUavPluginOption
 
             if (editTexSettings.Name is not null)
                 tex.m_Name = editTexSettings.Name;
-            if (editTexSettings.TextureFormat is not null)
+            if (editTexSettings.TextureFormat is not null && !preprocessingChanged)
                 tex.m_TextureFormat = (int)editTexSettings.TextureFormat.Value;
             if (editTexSettings.UsingMips is not null)
             {

@@ -39,6 +39,22 @@ The usual Unity image orientation is applied by the existing image path.
 
 ## Import and mip limits
 
+Edit Texture2D includes **Is preprocessed**. Changing true to false detiles
+the encoded data and saves a normal linear texture; changing false to true
+tiles it for the serialized file's PS4 or Switch platform. The conversion
+does not decode/recompress BC blocks. Switch conversion creates or clears
+its platform blob as appropriate. Batch selections support mixed values and
+the reset button restores the original selection value.
+
+Conversion currently supports the pixel/BC formats in the table above that
+the selected console swizzler supports. It requires one non-streaming 2D
+mip and a serialized preprocessing field. Apply image replacement, format
+and mip changes separately. Unsupported platforms, ambiguous Switch metadata
+and mismatched data sizes are rejected without updating the asset. Edge
+padding is discarded when becoming linear and zero-filled when tiling again;
+visible encoded elements are preserved, but unused padding need not match.
+Legacy Switch detection by nonempty platform blob remains unchanged.
+
 Export/preview decode the top level; trailing mip data is not exported.
 Import requires one non-streaming 2D image, one mip, unchanged dimensions
 and format, and exactly the expected padded size. Mip-chain import remains

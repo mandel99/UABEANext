@@ -223,4 +223,36 @@ Test("integrated BC1 path retains colors and orientation", () =>
     var actual=ImageResult.FromMemory(again.ToArray(),ColorComponents.RedGreenBlueAlpha);
     Check(expected.Data.SequenceEqual(actual.Data),"BC1 integrated roundtrip");
 });
+foreach (uint platform in new uint[] { 31, 38 })
+foreach (var format in new[] { TextureFormat.Alpha8, TextureFormat.R8, TextureFormat.RGBA32, TextureFormat.DXT1, TextureFormat.DXT5, TextureFormat.BC7 })
+Test($"preprocessing toggle {platform} {format} preserves encoded elements", () =>
+{
+    var tex = Texture(35, 19, format);
+    var layout = new Ps4MortonLayout(35, 19, format);
+    byte[] original = new byte[layout.LinearSize];
+    new Random(82).NextBytes(original);
+    tex.pictureData = original;
+    tex.m_PlatformBlob = [];
+    TexturePlatform.SetPreprocessed(tex, platform, true);
+    Check(tex.m_IsPreProcessed && tex.swizzleType != SwizzleType.None, "swizzle state");
+    Check(tex.m_Width == 35 && tex.m_Height == 19, "dimensions");
+    var tiled = tex.pictureData.ToArray();
+    TexturePlatform.SetPreprocessed(tex, platform, false);
+    Check(!tex.m_IsPreProcessed && tex.swizzleType == SwizzleType.None, "linear state");
+    Check(tex.pictureData.SequenceEqual(original), "encoded bytes changed");
+    Check(tex.m_CompleteImageSize == original.Length && tex.m_StreamData.path == "", "storage metadata");
+    TexturePlatform.SetPreprocessed(tex, platform, true);
+    Check(tex.pictureData.SequenceEqual(tiled), "repeat conversion differs");
+});
+Test("invalid preprocessing conversion leaves data and metadata intact", () =>
+{
+    var tex = Texture(35,19);
+    tex.pictureData = new byte[3];
+    var original = tex.pictureData;
+    Reject<NotSupportedException>(() => TexturePlatform.SetPreprocessed(tex, 5, true));
+    Reject<InvalidDataException>(() => TexturePlatform.SetPreprocessed(tex, 31, true));
+    tex.m_MipCount = 2;
+    Reject<NotSupportedException>(() => TexturePlatform.SetPreprocessed(tex, 31, true));
+    Check(ReferenceEquals(tex.pictureData, original) && !tex.m_IsPreProcessed && tex.m_StreamData.path == "original.resS", "failed conversion mutated texture");
+});
 Console.WriteLine($"{passed} tests passed.");
