@@ -172,4 +172,55 @@ Test($"PNG -> native {format} encoder -> swizzle -> PNG ({width}x{height})", () 
 else
     Console.WriteLine("SKIP native image import test: Windows encoder binaries required.");
 
+Test("platform routing uses PS4 + preprocessing, without requiring a blob", () =>
+{
+    var tex = Texture(32,32);
+    tex.m_PlatformBlob = [];
+    Check(TexturePlatform.GetSwizzleType(tex,31)==SwizzleType.None,"false flag");
+    tex.m_IsPreProcessed = true;
+    Check(TexturePlatform.GetSwizzleType(tex,31)==SwizzleType.PS4,"PS4 true flag");
+    Check(TexturePlatform.GetSwizzleType(tex,5)==SwizzleType.None,"non PS4");
+    Check(TexturePlatform.GetSwizzleType(tex,38)==SwizzleType.None,"empty Switch blob");
+    tex.m_PlatformBlob = new byte[96];
+    Check(TexturePlatform.GetSwizzleType(tex,38)==SwizzleType.Switch,"Switch retained");
+});
+
+foreach(var format in new[]{TextureFormat.Alpha8,TextureFormat.R8,TextureFormat.RGBA32,TextureFormat.ARGB32,TextureFormat.BGRA32})
+Test($"integrated {format} odd-size export/import is byte exact", () =>
+{
+    var tex=Texture(35,19,format);
+    var layout=new Ps4MortonLayout(35,19,format);
+    byte[] linear=new byte[layout.LinearSize];new Random(113).NextBytes(linear);
+    byte[] original=layout.Swizzle(linear,new byte[layout.TiledSize]);
+    tex.pictureData=original;
+    tex.m_IsPreProcessed=true;
+    tex.swizzleType=TexturePlatform.GetSwizzleType(tex,31);
+    using var png=new MemoryStream();
+    Check(tex.DecodeTextureImage(original,png,ImageExportType.Png),"export failed");
+    png.Position=0;
+    tex.EncodeTextureImage(png,1);
+    Check(tex.pictureData.SequenceEqual(original),"integrated roundtrip bytes changed");
+    Check(tex.m_Width==35 && tex.m_Height==19 && tex.m_IsPreProcessed,"metadata changed");
+    tex.m_MipCount=2;
+    png.Position=0;
+    Reject<NotSupportedException>(()=>tex.EncodeTextureImage(png,1));
+    Check(tex.pictureData.SequenceEqual(original),"failed import mutated data");
+});
+
+if (OperatingSystem.IsWindows())
+Test("integrated BC1 path retains colors and orientation", () =>
+{
+    var tex=Texture(64,36);
+    var layout=new Ps4MortonLayout(64,36,TextureFormat.DXT1);
+    var linear=new byte[layout.LinearSize];
+    for(int b=0;b<linear.Length/8;b++) BinaryPrimitives.WriteUInt16LittleEndian(linear.AsSpan(b*8),(ushort)(b%3==0?0xF800:0x001F));
+    tex.pictureData=layout.Swizzle(linear,new byte[layout.TiledSize]);
+    tex.m_IsPreProcessed=true;tex.swizzleType=TexturePlatform.GetSwizzleType(tex,31);
+    using var png=new MemoryStream();tex.DecodeTextureImage(tex.pictureData,png,ImageExportType.Png);
+    var expected=ImageResult.FromMemory(png.ToArray(),ColorComponents.RedGreenBlueAlpha);
+    png.Position=0;tex.EncodeTextureImage(png,1);
+    using var again=new MemoryStream();tex.DecodeTextureImage(tex.pictureData,again,ImageExportType.Png);
+    var actual=ImageResult.FromMemory(again.ToArray(),ColorComponents.RedGreenBlueAlpha);
+    Check(expected.Data.SequenceEqual(actual.Data),"BC1 integrated roundtrip");
+});
 Console.WriteLine($"{passed} tests passed.");

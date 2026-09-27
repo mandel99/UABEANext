@@ -7,8 +7,9 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../../Libraries/AssetsTools.NET/AssetsTools.NET.Texture/AssetsTools.NET.Texture.csproj" />
-    <Compile Include="../../TexturePlugin/Helpers/Ps4MortonLayout.cs" Link="Ps4MortonLayout.cs" />
-    <Compile Include="../../TexturePlugin/Helpers/Ps4TextureCodec.cs" Link="Ps4TextureCodec.cs" />
+
+    <Compile Include="../../TexturePlugin/Helpers/TexturePlatform.cs" Link="TexturePlatform.cs" />
+    <Compile Include="../../UABEANext4/Logic/AssetInfo/BuildTarget.cs" Link="BuildTarget.cs" />
     <None Include="../../NativeLibs/win-x64/*.dll" Link="%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" Condition="$([MSBuild]::IsOsPlatform(Windows))" />
   </ItemGroup>
 </Project>

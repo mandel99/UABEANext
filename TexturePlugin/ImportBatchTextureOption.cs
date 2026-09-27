@@ -79,10 +79,7 @@ public class ImportBatchTextureOption : IUavPluginOption
             }
 
             var tex = TextureFile.ReadTextureFile(baseField);
-            if (tex.m_PlatformBlob.Length != 0)
-            {
-                TextureHelper.SwizzleOptIn(tex, asset.FileInstance.file);
-            }
+            TextureHelper.SwizzleOptIn(tex, asset.FileInstance.file);
 
             if (info.ImportFile == null || !File.Exists(info.ImportFile))
             {
@@ -95,6 +92,8 @@ public class ImportBatchTextureOption : IUavPluginOption
 
             try
             {
+                if (tex.swizzleType == SwizzleType.PS4)
+                    tex.FillPictureData(asset.FileInstance);
                 tex.EncodeTextureImage(info.ImportFile, mipCount: mipCount);
                 tex.WriteTo(baseField);
                 asset.UpdateAssetDataAndRow(workspace, baseField);

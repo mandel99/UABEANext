@@ -87,11 +87,6 @@ public static class TextureHelper
 
     public static void SwizzleOptIn(TextureFile texture, AssetsFile file)
     {
-        // note: this means "swizzle if it seems enabled" not "always enable swizzle"
-        // for switch, if platformblob isn't present, this value is pretty much ignored
-        if (file.Metadata.TargetPlatform == (uint)BuildTarget.Switch)
-        {
-            texture.swizzleType = SwizzleType.Switch;
-        }
+        texture.swizzleType = TexturePlatform.GetSwizzleType(texture, file.Metadata.TargetPlatform);
     }
 }

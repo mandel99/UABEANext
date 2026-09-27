@@ -120,10 +120,7 @@ public class TextureLoader
             var texture = TextureFile.ReadTextureFile(textureEditBf);
             format = (TextureFormat)texture.m_TextureFormat;
 
-            if (texture.m_PlatformBlob.Length != 0)
-            {
-                TextureHelper.SwizzleOptIn(texture, textureAsset.FileInstance.file);
-            }
+            TextureHelper.SwizzleOptIn(texture, textureAsset.FileInstance.file);
 
             var encTextureData = texture.FillPictureData(textureAsset.FileInstance);
             var textureData = texture.DecodeTextureRaw(encTextureData);
@@ -372,10 +369,7 @@ public class TextureLoader
         var texture = TextureFile.ReadTextureFile(textureEditBf);
         format = (TextureFormat)texture.m_TextureFormat;
 
-        if (texture.m_PlatformBlob.Length != 0)
-        {
-            TextureHelper.SwizzleOptIn(texture, asset.FileInstance.file);
-        }
+        TextureHelper.SwizzleOptIn(texture, asset.FileInstance.file);
 
         var encTextureData = texture.FillPictureData(asset.FileInstance);
         // rare, but sometimes we see large textures with 0 texture data size

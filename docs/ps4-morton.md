@@ -1,68 +1,70 @@
 # PS4 Morton 8x8 textures (experimental)
 
-This fork adds two explicit TexturePlugin actions:
+PS4 textures now use the existing preview, Export Texture2D/Sprite, image
+import and Edit workflows. There are no separate PS4 menu entries.
+AssetsTools.NET implements the ISwizzler interface used by Switch textures.
 
-- **Export Texture2D PNG (PS4 Morton 8x8)**: export one texture or a selection
-  to PNG, deswizzling compressed blocks before decoding the top mip.
-- **Import Texture2D image (PS4 Morton 8x8)**: replace one texture from an
-  image, or a selection using the existing batch filename matching dialog.
-  Save the modified asset/bundle using UABEA's normal save workflow.
+Automatic selection requires both serialized-file target platform PS4 (31)
+and Texture2D `m_IsPreProcessed = true`. A missing or false flag retains the
+standard linear path. PS4 does not require a nonempty `m_PlatformBlob`.
+Switch selection still requires its original platform blob.
 
-Use these actions only for textures known to use row-major 8x8 Morton
-microtiles of compressed 4x4 blocks. They do not detect PS4 layouts and do
-not implement AMD macrotiles, alternate pitches, arrays, volumes, or mip
-tails. Standard export/import and the automatic preview remain unchanged;
-use the exported PNG to inspect the deswizzled result. Do not use the normal
-image import action for a tiled texture.
+The block size comes from `m_TextureFormat`, not from PNG dimensions:
 
-Supported block formats: DXT1 (BC1), DXT3 (BC2), DXT5 (BC3), BC4, BC5, BC6H,
-and BC7. Crunch-compressed data and uncompressed pixel formats are rejected.
-PNG export is an 8-bit image, so it does not preserve BC6H HDR precision.
-Image import uses the bundled native compressor and is lossy according to
-the original format. This is an image editing path, not lossless BC storage
-roundtripping. Encoder availability may vary by platform and format.
+| Formats | Element size | Bytes per element |
+| --- | --- | ---: |
+| Alpha8, R8 | 1x1 pixel | 1 |
+| RGBA32, ARGB32, BGRA32 | 1x1 pixel | 4 |
+| DXT1 / BC4 | 4x4 pixels | 8 |
+| DXT3 / DXT5 / BC5 / BC6H / BC7 | 4x4 pixels | 16 |
 
-## Why the padded tail matters
+The flag is a routing condition, not proof of every possible PS4 layout.
+This implementation supports row-major 8x8 Morton microtiles only. AMD
+macrotiles, alternate pitches, arrays and volumes are not implemented.
+Unsupported formats and truncated buffers fail explicitly.
 
-Each tile stores all 64 blocks, even at an incomplete logical edge. A
-1024x684 texture has a logical grid of 256x171 BC blocks, but storage is
-256x176 blocks (1024x704 pixels):
+## Padding and orientation
 
-| Format | Logical bytes | Padded top-level bytes |
-| --- | ---: | ---: |
-| BC1 / BC4 | 350208 | 360448 |
-| BC2 / BC3 / BC5 / BC6H / BC7 | 700416 | 720896 |
+Each tile stores all 64 elements, including incomplete logical edges.
+For example, a 1024x684 BC texture uses a 256x171 logical block grid but
+256x176 stored blocks (1024x704 pixels). BC1 requires 360448 stored bytes;
+BC3 requires 720896. Decoding at logical dimensions before detiling discards
+bytes that still contain visible blocks. A PNG made that way cannot restore
+them without the original texture data.
 
-Decoding the tiled stream at the logical dimensions first drops bytes that
-still contain visible blocks. Rearranging the resulting PNG cannot recover
-them. The PS4 export instead reads the asset's complete texture data (inline
-or external), detiles BC blocks, then decodes only the logical image. It
-rejects a short top-level buffer rather than inserting transparent holes.
-Mips following a complete top level are ignored during export.
+The complete inline or external data is read before detiling. The source
+index is `((y / 8) * ceil(blocksWide / 8) + x / 8) * 64 + Morton(x % 8, y % 8)`.
+Morton interleaves `x0,y0,x1,y1,x2,y2`. Decoding and logical cropping follow.
+The usual Unity image orientation is applied by the existing image path.
 
-For block coordinates x,y the source block index is
-`((y / 8) * ceil(blocksWide / 8) + x / 8) * 64 + Morton(x % 8, y % 8)`.
-Morton interleaves `x0,y0,x1,y1,x2,y2`. There is no compact edge traversal.
+## Import and mip limits
 
-## Import limits
+Export/preview decode the top level; trailing mip data is not exported.
+Import requires one non-streaming 2D image, one mip, unchanged dimensions
+and format, and exactly the expected padded size. Mip-chain import remains
+unsupported. This does not claim that PS4 mipmaps are solved.
 
-Import currently requires one non-streaming mip, one 2D image, the same
-logical dimensions and format, and exactly the expected padded byte size.
-Unknown layouts and mip chains are rejected before the asset is changed.
-Existing padding blocks and platform metadata are retained. The replacement
-is stored inline, as with the standard UABEA import, with a complete padded
-image size. Original external resource bytes are not edited.
+Import retains padding bytes, preprocessing and platform metadata. The
+replacement is stored inline through the standard save workflow; original
+external resource bytes are not overwritten. Encoding and swizzling finish
+before picture data is replaced. Pixel formats use managed encoding;
+BC formats require the native compressor and can be lossy. BC6H PNG export
+does not preserve HDR precision.
 
-The importer performs compression in a temporary buffer and only commits
-after all checks and swizzling succeed. The bundled native buffer loader
-expects BGRA input and handles vertical orientation itself; the plugin
-converts RGBA to BGRA explicitly. A native encoder regression test covers
-both channel order and vertical orientation.
+## Validation
 
-This implementation is verified with synthetic buffers and native encoder
-roundtrips. It has not yet been validated against the original EO_015 asset
-or by loading an edited asset in a PS4 game. That original raw asset was not
-available; no game images are included in this repository.
+A user-supplied Unity 2020.3.48f1 PS4 bundle contained a 2048x2048 Alpha8
+SDF atlas, one mip, `m_IsPreProcessed=true`, an empty platform blob and
+4194304 external texture bytes. The reconstructed glyph atlas is readable.
+Export to PNG, import, bundle save and reload preserved all 4194304 texture
+bytes exactly. This validates that sample; in-game loading and other PS4
+hardware layouts have not been verified. Private game assets are not included.
+
+The console tests cover independent Morton fixtures for seven BC formats,
+partial tiles, padding, the 1024x684 truncated-tail regression, platform
+routing and five byte-exact pixel-format roundtrips at odd dimensions.
+Windows tests also exercise native BC encoding, channel order and orientation.
+The previous standalone codec is retained only as a test reference.
 
 ## Build and test
 
@@ -72,15 +74,5 @@ dotnet build UABEANext4.sln -c Release
 dotnet run --project Tests/Ps4TextureTests -c Release
 ```
 
-Use a .NET SDK supported by upstream. The fork replaces one upstream
-null-conditional assignment with an equivalent null check so the solution
-also compiles with the installed .NET 9 SDK without preview language flags.
-The AssetsTools.NET submodule remains at its upstream revision.
-
-The console test project exits nonzero on failure. It covers known Morton
-addresses, independently generated tiles in all seven formats, complete
-and partial tiles, odd logical dimensions, padding preservation, the
-1024x684 missing-tail regression, PNG pixel order, metadata preservation,
-rejected imports, and native BC1/BC3/BC7 image import on Windows, including
-odd dimensions. Other platforms
-run the managed tests and explicitly skip the Windows native encoder test.
+The AssetsTools.NET submodule points to this fork's PS4 implementation.
+No separate plugin installation or menu selection is needed.

@@ -51,9 +51,17 @@ public class EditTextureOption : IUavPluginOption
             }
 
             var tex = TextureFile.ReadTextureFile(baseField);
-            if (tex.m_PlatformBlob.Length != 0)
+            TextureHelper.SwizzleOptIn(tex, asset.FileInstance.file);
+
+            if (tex.swizzleType == SwizzleType.PS4)
             {
-                TextureHelper.SwizzleOptIn(tex, asset.FileInstance.file);
+                if ((editTexSettings.TextureFormat is not null && (int)editTexSettings.TextureFormat != tex.m_TextureFormat)
+                    || (editTexSettings.UsingMips is not null && editTexSettings.UsingMips != tex.m_MipMap))
+                {
+                    errorBuilder.AppendLine($"[{errorAssetName}]: PS4 edits must retain the texture format and mip settings.");
+                    continue;
+                }
+                tex.FillPictureData(asset.FileInstance);
             }
 
             byte[]? texOrigDecBytes = null;
@@ -71,10 +79,7 @@ public class EditTextureOption : IUavPluginOption
                     // if we've toggled mips on, only make a change if the current
                     // mipcount is different from what we would change it to.
                     var usingMips = editTexSettings.UsingMips.Value;
-                    if (usingMips)
-                        needToReencode |= tex.m_MipCount != 1;
-                    else
-                        needToReencode |= tex.m_MipCount == 1;
+                    needToReencode |= usingMips != tex.m_MipMap;
                 }
 
                 if (needToReencode)
@@ -101,8 +106,10 @@ public class EditTextureOption : IUavPluginOption
                 tex.m_TextureFormat = (int)editTexSettings.TextureFormat.Value;
             if (editTexSettings.UsingMips is not null)
             {
-                tex.m_MipMap = editTexSettings.UsingMips.Value;
-                tex.m_MipCount = int.MaxValue; // will get lowered to correct mip count later
+                bool usingMips = editTexSettings.UsingMips.Value;
+                if (usingMips != tex.m_MipMap)
+                    tex.m_MipCount = usingMips ? int.MaxValue : 1;
+                tex.m_MipMap = usingMips;
             }
             if (editTexSettings.IsReadable is not null)
                 tex.m_IsReadable = editTexSettings.IsReadable.Value;
@@ -133,6 +140,7 @@ public class EditTextureOption : IUavPluginOption
                 catch (Exception e)
                 {
                     errorBuilder.AppendLine($"[{errorAssetName}]: failed to import: {e}");
+                    continue;
                 }
             }
             else if (singleTextureEdit)
@@ -145,6 +153,7 @@ public class EditTextureOption : IUavPluginOption
                 catch (Exception e)
                 {
                     errorBuilder.AppendLine($"[{errorAssetName}]: failed to import: {e}");
+                    continue;
                 }
             }
 
