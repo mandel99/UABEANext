@@ -37,6 +37,10 @@ that mode after toggling off and on. Normal image replacement retains it.
 PS5 mip tails, mip chains, arrays, cubemaps, display/XOR layouts and RGB24
 storage are not implemented. Existing PS4 mip-chain handling is unchanged.
 
+See [Where the original texture padding comes from](texture-padding-origin.md)
+for the byte-exact PS4 cross-texture finding, the public AMD copy behavior,
+and the remaining uncertainty about the PS5 sample's padding.
+
 ## Review and validation
 
 Address equations were independently compared at every logical element of
