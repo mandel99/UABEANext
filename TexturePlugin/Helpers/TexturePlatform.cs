@@ -12,10 +12,12 @@ public static class TexturePlatform
         if (platform != (uint)BuildTarget.PS4 && platform != (uint)BuildTarget.Switch)
             throw new NotSupportedException("Preprocessing conversion is supported only for PS4 and Switch.");
         if (texture.m_ImageCount != 1 || texture.m_TextureDimension != 2
-            || texture.m_MipCount != 1 || texture.m_MipMap || texture.m_StreamingMipmaps)
-            throw new NotSupportedException("Preprocessing conversion requires one non-streaming 2D mip.");
+            || texture.m_StreamingMipmaps)
+            throw new NotSupportedException("Preprocessing conversion requires a non-streaming 2D texture.");
         var format = (TextureFormat)texture.m_TextureFormat;
         bool isSwitch = platform == (uint)BuildTarget.Switch;
+        if (isSwitch && (texture.m_MipCount != 1 || texture.m_MipMap))
+            throw new NotSupportedException("Switch preprocessing conversion currently requires one mip.");
         if (isSwitch && enabled && texture.m_PlatformBlob.Length != 0)
             throw new NotSupportedException("Switch texture already has platform metadata despite a false preprocessing flag; its storage is ambiguous.");
         if (isSwitch && !enabled) format = SwitchSwizzle.GetCorrectedSwitchTextureFormat(format);
@@ -24,7 +26,8 @@ public static class TexturePlatform
         byte[] source = texture.pictureData ?? throw new InvalidDataException("Load the complete texture data before conversion.");
         if (!isSwitch && enabled && format == TextureFormat.RGB24)
         {
-            int pixels = checked(texture.m_Width * texture.m_Height);
+            var rgbChain = new Ps4MipChain(texture.m_Width, texture.m_Height, format, texture.m_MipCount);
+            int pixels = rgbChain.LinearSize / 4;
             if (source.Length != checked(pixels * 3))
                 throw new InvalidDataException("Linear RGB24 must contain three bytes per pixel.");
             var rgba = new byte[checked(pixels * 4)];
@@ -39,9 +42,11 @@ public static class TexturePlatform
         byte[] blob = texture.m_PlatformBlob;
         if (!isSwitch)
         {
-            int expected = enabled ? layout.LinearSize : layout.TiledSize;
+            var chain = new Ps4MipChain(texture.m_Width, texture.m_Height, format, texture.m_MipCount);
+            int expected = enabled ? chain.LinearSize : chain.TiledSize;
             if (source.Length != expected) throw new InvalidDataException("Texture size does not match the supported PS4 layout.");
-            result = enabled ? layout.Swizzle(source, new byte[layout.TiledSize]) : layout.Deswizzle(source);
+            result = enabled ? chain.Swizzle(chain.SplitLinear(source))
+                : TextureOperations.FlattenMips(chain.Deswizzle(source), out _);
         }
         else
         {

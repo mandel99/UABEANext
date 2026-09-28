@@ -48,7 +48,7 @@ index is `((y / 8) * ceil(blocksWide / 8) + x / 8) * 64 + Morton(x % 8, y % 8)`.
 Morton interleaves `x0,y0,x1,y1,x2,y2`. Decoding and logical cropping follow.
 The usual Unity image orientation is applied by the existing image path.
 
-## Import and mip limits
+## Import and mip chains
 
 Edit Texture2D includes **Is preprocessed**. Changing true to false detiles
 the encoded data and saves a normal linear texture; changing false to true
@@ -58,8 +58,9 @@ its platform blob as appropriate. Batch selections support mixed values and
 the reset button restores the original selection value.
 
 Conversion currently supports the pixel/BC formats in the table above that
-the selected console swizzler supports. It requires one non-streaming 2D
-mip and a serialized preprocessing field. Apply image replacement, format
+the selected console swizzler supports. It requires a non-streaming 2D
+texture and a serialized preprocessing field. PS4 converts the complete mip
+chain; Switch conversion remains limited to one mip. Apply image replacement, format
 and mip changes separately. Unsupported platforms, ambiguous Switch metadata
 and mismatched data sizes are rejected without updating the asset. Edge
 padding is discarded when becoming linear and zero-filled when tiling again;
@@ -67,9 +68,20 @@ visible encoded elements are preserved, but unused padding need not match.
 Legacy Switch detection by nonempty platform blob remains unchanged.
 
 Export/preview decode the top level; trailing mip data is not exported.
-Import requires one non-streaming 2D image, one mip, unchanged dimensions
-and format, and exactly the expected padded size. Mip-chain import remains
-unsupported. This does not claim that PS4 mipmaps are solved.
+PS4 import requires one non-streaming 2D image, unchanged dimensions,
+format and mip count, and exactly the expected padded chain size.
+Each mip has logical dimensions max(1, width >> level) and max(1, height >>
+level), its own complete 8x8 element tiles, and follows the preceding mip
+without additional gaps. Packed tails and other surface modes are unsupported.
+
+`Ps4MipChain` exposes per-level offsets, deswizzle, linear-chain splitting
+and swizzle with an optional original padding buffer. Reconstruction from
+raw levels retains the original encoded bytes exactly, including padding.
+Importing an edited PNG regenerates all lower mips: managed pixel formats
+use a box filter in stored channel space; BC formats use the existing native
+encoder's mip generation and lossy compression. This does not reproduce an
+authored mip chain or provide gamma-aware/normal-map-specific filtering.
+PNG export/preview still show the top level only.
 
 Import retains padding bytes, preprocessing and platform metadata. The
 replacement is stored inline through the standard save workflow; original
@@ -79,6 +91,13 @@ BC formats require the native compressor and can be lossy. BC6H PNG export
 does not preserve HDR precision.
 
 ## Validation
+
+The complete chains of 438 original PS4 textures (5106 levels) passed byte-
+exact reconstruction with the new chain API. Original RGBA32, BC1 and BC3
+textures passed PNG import with mip regeneration and padding preservation,
+then save/reload of their serialized asset copy. Synthetic tests additionally
+cover odd dimensions, native BC7 mips, channel order, per-level orientation,
+malformed sizes and complete-chain preprocessing toggles.
 
 An additional PS4 game asset set contained 107 preprocessed RGB24 textures.
 All used four-byte pixel storage and passed byte-exact PNG export/import

@@ -252,7 +252,7 @@ Test("invalid preprocessing conversion leaves data and metadata intact", () =>
     Reject<NotSupportedException>(() => TexturePlatform.SetPreprocessed(tex, 5, true));
     Reject<InvalidDataException>(() => TexturePlatform.SetPreprocessed(tex, 31, true));
     tex.m_MipCount = 2;
-    Reject<NotSupportedException>(() => TexturePlatform.SetPreprocessed(tex, 31, true));
+    Reject<InvalidDataException>(() => TexturePlatform.SetPreprocessed(tex, 31, true));
     Check(ReferenceEquals(tex.pictureData, original) && !tex.m_IsPreProcessed && tex.m_StreamData.path == "original.resS", "failed conversion mutated texture");
 });
 Test("PS4 RGB24 preprocessing expands storage and disabling writes honest RGBA32 metadata", () =>
@@ -266,6 +266,72 @@ Test("PS4 RGB24 preprocessing expands storage and disabling writes honest RGBA32
  for(int i=0;i<13*9;i++){
   Check(tex.pictureData.AsSpan(i*4,3).SequenceEqual(source.AsSpan(i*3,3)),"RGB values");
   Check(tex.pictureData[i*4+3]==255,"expanded alpha");
+ }
+});
+Test("PS4 mip chain offsets and independent per-level mapping", () =>
+{
+ var chain=new Ps4MipChain(35,19,TextureFormat.DXT1,6);
+ Check(chain.Offsets.SequenceEqual(new[]{0,1024,1536,2048,2560,3072}),"mip offsets");
+ Check(chain.TiledSize==3584 && chain.LinearSize==520,"chain sizes");
+ var original=new byte[chain.TiledSize];new Random(19).NextBytes(original);
+ var mips=chain.Deswizzle(original);
+ Check(chain.Swizzle(mips,original).SequenceEqual(original),"full chain padding roundtrip");
+ for(int i=0;i<6;i++){
+  var reference=ReferenceTile(mips[i],Math.Max(1,35>>i),Math.Max(1,19>>i),8);
+  // Independent helper has fixed padding; compare only real elements via layout.
+  Check(chain.Levels[i].Deswizzle(reference).SequenceEqual(mips[i]),"independent level mapping");
+ }
+ Reject<InvalidDataException>(()=>chain.Deswizzle(original[..^1]));
+ Reject<ArgumentOutOfRangeException>(()=>new Ps4MipChain(35,19,TextureFormat.DXT1,7));
+ var tex=Texture(35,19);tex.m_MipCount=6;tex.m_MipMap=true;tex.m_IsPreProcessed=true;tex.pictureData=original;
+ TexturePlatform.SetPreprocessed(tex,31,false);
+ Check(tex.pictureData.Length==520 && tex.m_MipCount==6,"linear mip chain");
+ TexturePlatform.SetPreprocessed(tex,31,true);
+ var returned=chain.Deswizzle(tex.pictureData);
+ Check(returned.Zip(mips,(a,b)=>a.SequenceEqual(b)).All(x=>x),"toggle preserves all visible mip blocks");
+});
+foreach(var format in new[]{TextureFormat.Alpha8,TextureFormat.RGBA32,TextureFormat.DXT1,TextureFormat.DXT5,TextureFormat.BC7})
+if(OperatingSystem.IsWindows() || format==TextureFormat.Alpha8 || format==TextureFormat.RGBA32)
+Test($"PS4 {format} image import rebuilds every mip and retains padding",()=>
+{
+ const int w=35,h=19,count=6;
+ var chain=new Ps4MipChain(w,h,format,count);
+ var original=new byte[chain.TiledSize];Array.Fill(original,(byte)0xA5);
+ var tex=Texture(w,h,format);tex.m_MipCount=count;tex.m_MipMap=true;tex.pictureData=original;tex.swizzleType=SwizzleType.PS4;tex.m_IsPreProcessed=true;
+ var rgba=new byte[w*h*4];
+ for(int i=0;i<w*h;i++){rgba[i*4]=255;rgba[i*4+3]=255;}
+ tex.EncodeTextureRaw(rgba,w,h,mipCount:count,useBgra:false);
+ Check(tex.m_MipCount==count && tex.m_MipMap && tex.pictureData.Length==chain.TiledSize,"mip metadata");
+ var encoded=chain.Deswizzle(tex.pictureData);
+ Check(chain.Swizzle(encoded,original).SequenceEqual(tex.pictureData),"padding changed");
+ for(int i=0;i<count;i++){
+  int mw=Math.Max(1,w>>i),mh=Math.Max(1,h>>i);
+  var level=tex.pictureData.AsSpan(chain.Offsets[i],chain.Levels[i].TiledSize).ToArray();
+  var decoded=TextureFile.DecodeManagedData(level,format,mw,mh,false,new Ps4Swizzle(mw,mh,format));
+  for(int j=0;j<decoded.Length;j+=4){
+   Check(decoded[j+3]>=247,"mip alpha");
+   if(format!=TextureFormat.Alpha8)Check(decoded[j]>=247 && decoded[j+1]<=8 && decoded[j+2]<=8,"mip channel order");
+  }
+ }
+});
+foreach(var format in new[]{TextureFormat.RGBA32,TextureFormat.DXT1,TextureFormat.DXT5,TextureFormat.BC7})
+if(OperatingSystem.IsWindows() || format==TextureFormat.RGBA32)
+Test($"PS4 {format} mip regeneration preserves vertical orientation",()=>
+{
+ const int size=32,count=6;
+ var chain=new Ps4MipChain(size,size,format,count);
+ var tex=Texture(size,size,format);tex.m_MipCount=count;tex.m_MipMap=true;tex.pictureData=new byte[chain.TiledSize];tex.swizzleType=SwizzleType.PS4;
+ var rgba=new byte[size*size*4];
+ for(int y=0;y<size;y++)for(int x=0;x<size;x++){
+  int i=(y*size+x)*4;rgba[i+(y<size/2?0:2)]=255;rgba[i+3]=255;
+ }
+ tex.EncodeTextureRaw(rgba,size,size,mipCount:count,useBgra:false);
+ for(int mip=0;mip<count-1;mip++){
+  int side=size>>mip;
+  var data=tex.pictureData.AsSpan(chain.Offsets[mip],chain.Levels[mip].TiledSize).ToArray();
+  var dec=TextureFile.DecodeManagedData(data,format,side,side,false,new Ps4Swizzle(side,side,format));
+  int top=(side-1)*side*4;
+  Check(dec[2]>dec[0]+100 && dec[top]>dec[top+2]+100,"red top / blue bottom mip "+mip+" bottom="+string.Join(",",dec.Take(4))+" top="+string.Join(",",dec.Skip(top).Take(4)));
  }
 });
 Console.WriteLine($"{passed} tests passed.");

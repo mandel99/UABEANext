@@ -88,7 +88,8 @@ public class ImportBatchTextureOption : IUavPluginOption
             }
 
             var singleMip = tex.m_MipCount == 1;
-            var mipCount = singleMip ? 1 : int.MinValue;
+            var mipCount = tex.swizzleType == SwizzleType.PS4 ? tex.m_MipCount
+                : singleMip ? 1 : int.MinValue;
 
             try
             {
