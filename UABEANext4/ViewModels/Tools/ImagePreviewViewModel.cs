@@ -35,7 +35,8 @@ public partial class ImagePreviewViewModel : ViewModelBase
     public void ConfigureTexturePreview(Func<bool, (Bitmap?, int, string?)>? preview)
     {
         _texturePreview = null;
-        ShowSwizzled = false;
+        // Keep the user's display preference when switching assets, including
+        // selections that temporarily hide the swizzled-preview option.
         PreviewError = null;
         CanShowSwizzled = preview != null;
         _texturePreview = preview;
