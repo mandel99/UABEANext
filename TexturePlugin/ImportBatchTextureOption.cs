@@ -88,12 +88,14 @@ public class ImportBatchTextureOption : IUavPluginOption
             }
 
             var singleMip = tex.m_MipCount == 1;
-            var mipCount = tex.swizzleType == SwizzleType.PS4 ? tex.m_MipCount
+            var consolePreprocessed = tex.swizzleType is SwizzleType.PS4 or SwizzleType.PS5;
+            var mipCount = consolePreprocessed ? tex.m_MipCount
                 : singleMip ? 1 : int.MinValue;
 
             try
             {
-                if (tex.swizzleType == SwizzleType.PS4)
+                // Keep original console padding available to the swizzler.
+                if (consolePreprocessed)
                     tex.FillPictureData(asset.FileInstance);
                 tex.EncodeTextureImage(info.ImportFile, mipCount: mipCount);
                 tex.WriteTo(baseField);

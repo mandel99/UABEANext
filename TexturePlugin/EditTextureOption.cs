@@ -74,14 +74,17 @@ public class EditTextureOption : IUavPluginOption
                 }
             }
 
-            if (tex.swizzleType == SwizzleType.PS4)
+            if (tex.swizzleType is SwizzleType.PS4 or SwizzleType.PS5)
             {
                 if ((editTexSettings.TextureFormat is not null && (int)editTexSettings.TextureFormat != tex.m_TextureFormat)
                     || (editTexSettings.UsingMips is not null && editTexSettings.UsingMips != tex.m_MipMap))
                 {
-                    errorBuilder.AppendLine($"[{errorAssetName}]: PS4 edits must retain the texture format and mip settings.");
+                    errorBuilder.AppendLine($"[{errorAssetName}]: Console-preprocessed edits must retain the texture format and mip settings.");
                     continue;
                 }
+
+                // Load the complete external/inline source before encoding so the
+                // console swizzler can retain the original tiled padding bytes.
                 tex.FillPictureData(asset.FileInstance);
             }
 

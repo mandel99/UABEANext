@@ -9,22 +9,33 @@ public static class TexturePlatform
     public static void SetPreprocessed(TextureFile texture, uint platform, bool enabled)
     {
         if (texture.m_IsPreProcessed == enabled) return;
-        if (platform != (uint)BuildTarget.PS4 && platform != (uint)BuildTarget.Switch)
-            throw new NotSupportedException("Preprocessing conversion is supported only for PS4 and Switch.");
-        if (texture.m_ImageCount != 1 || texture.m_TextureDimension != 2
-            || texture.m_StreamingMipmaps)
-            throw new NotSupportedException("Preprocessing conversion requires a non-streaming 2D texture.");
-        var format = (TextureFormat)texture.m_TextureFormat;
+
+        bool isPs4 = platform == (uint)BuildTarget.PS4;
+        bool isPs5 = platform == (uint)BuildTarget.PS5;
         bool isSwitch = platform == (uint)BuildTarget.Switch;
+        if (!isPs4 && !isPs5 && !isSwitch)
+            throw new NotSupportedException("Preprocessing conversion is supported only for PS4, PS5 and Switch.");
+
+        if (texture.m_ImageCount != 1 || texture.m_TextureDimension != 2 || texture.m_StreamingMipmaps)
+            throw new NotSupportedException("Preprocessing conversion requires a non-streaming 2D texture.");
+
+        var format = (TextureFormat)texture.m_TextureFormat;
+
         if (isSwitch && (texture.m_MipCount != 1 || texture.m_MipMap))
             throw new NotSupportedException("Switch preprocessing conversion currently requires one mip.");
+        if (isPs5 && (texture.m_MipCount != 1 || texture.m_MipMap))
+            throw new NotSupportedException("PS5 preprocessing conversion currently requires one mip.");
         if (isSwitch && enabled && texture.m_PlatformBlob.Length != 0)
             throw new NotSupportedException("Switch texture already has platform metadata despite a false preprocessing flag; its storage is ambiguous.");
-        if (isSwitch && !enabled) format = SwitchSwizzle.GetCorrectedSwitchTextureFormat(format);
-        if (!isSwitch && !enabled) format = Ps4MortonLayout.GetStorageFormat(format);
-        var layout = new Ps4MortonLayout(texture.m_Width, texture.m_Height, format);
+
+        if (isSwitch && !enabled)
+            format = SwitchSwizzle.GetCorrectedSwitchTextureFormat(format);
+        if (isPs4 && !enabled)
+            format = Ps4MortonLayout.GetStorageFormat(format);
+
         byte[] source = texture.pictureData ?? throw new InvalidDataException("Load the complete texture data before conversion.");
-        if (!isSwitch && enabled && format == TextureFormat.RGB24)
+
+        if (isPs4 && enabled && format == TextureFormat.RGB24)
         {
             var rgbChain = new Ps4MipChain(texture.m_Width, texture.m_Height, format, texture.m_MipCount);
             int pixels = rgbChain.LinearSize / 4;
@@ -38,30 +49,61 @@ public static class TexturePlatform
             }
             source = rgba;
         }
+
         byte[] result;
         byte[] blob = texture.m_PlatformBlob;
-        if (!isSwitch)
+
+        if (isPs4)
         {
             var chain = new Ps4MipChain(texture.m_Width, texture.m_Height, format, texture.m_MipCount);
             int expected = enabled ? chain.LinearSize : chain.TiledSize;
-            if (source.Length != expected) throw new InvalidDataException("Texture size does not match the supported PS4 layout.");
-            result = enabled ? chain.Swizzle(chain.SplitLinear(source))
+            if (source.Length != expected)
+                throw new InvalidDataException("Texture size does not match the supported PS4 layout.");
+            result = enabled
+                ? chain.Swizzle(chain.SplitLinear(source))
                 : TextureOperations.FlattenMips(chain.Deswizzle(source), out _);
+        }
+        else if (isPs5)
+        {
+            if (enabled)
+            {
+                // New tiled data uses 4 KiB standard mode. Require it to be
+                // identifiable on reload without inventing platform metadata.
+                var layout = new Ps5GfxLayout(
+                    texture.m_Width, texture.m_Height, format, Ps5GfxLayout.TileMode4KB);
+                Ps5GfxLayout.InferTileMode(texture.m_Width, texture.m_Height, format, layout.TiledSize);
+                if (source.Length != layout.LinearSize)
+                    throw new InvalidDataException(
+                        $"Texture size does not match the supported PS5 linear layout (expected {layout.LinearSize}, got {source.Length}).");
+                result = layout.Swizzle(source);
+            }
+            else
+            {
+                int tileMode = Ps5GfxLayout.InferTileMode(
+                    texture.m_Width, texture.m_Height, format, source.Length);
+                var layout = new Ps5GfxLayout(texture.m_Width, texture.m_Height, format, tileMode);
+                result = layout.Deswizzle(source);
+            }
         }
         else
         {
+            var layout = new Ps4MortonLayout(texture.m_Width, texture.m_Height, format);
             var block = SwitchSwizzle.GetTextureFormatBlockSize(format);
             if (block.IsEmpty) throw new NotSupportedException("Unsupported Switch format.");
             if (!enabled && (blob == null || blob.Length < 12))
                 throw new InvalidDataException("Switch platform metadata is missing.");
-            int gobHeight = enabled ? SwitchSwizzle.GetBlockHeightByBlockSize(block, texture.m_Height)
+
+            int gobHeight = enabled
+                ? SwitchSwizzle.GetBlockHeightByBlockSize(block, texture.m_Height)
                 : SwitchSwizzle.GetBlockHeightByPlatformBlob(blob);
-            var padded = SwitchSwizzle.GetPaddedTextureSize(texture.m_Width, texture.m_Height, block.Width, block.Height, gobHeight);
+            var padded = SwitchSwizzle.GetPaddedTextureSize(
+                texture.m_Width, texture.m_Height, block.Width, block.Height, gobHeight);
             int stride = checked(padded.Width / block.Width * 16);
             int storedSize = checked(stride * (padded.Height / block.Height));
             int logicalStride = checked(layout.BlocksWide * layout.BytesPerBlock);
             if (source.Length != (enabled ? layout.LinearSize : storedSize))
                 throw new InvalidDataException("Texture size does not match the supported Switch layout.");
+
             if (enabled)
             {
                 var paddedData = new byte[storedSize];
@@ -81,6 +123,7 @@ public static class TexturePlatform
                 blob = Array.Empty<byte>();
             }
         }
+
         // Commit only after every validation and conversion has succeeded.
         texture.pictureData = result;
         texture.m_CompleteImageSize = result.Length;
@@ -97,6 +140,8 @@ public static class TexturePlatform
     {
         if (targetPlatform == (uint)BuildTarget.PS4 && texture.m_IsPreProcessed)
             return SwizzleType.PS4;
+        if (targetPlatform == (uint)BuildTarget.PS5 && texture.m_IsPreProcessed)
+            return SwizzleType.PS5;
         if (targetPlatform == (uint)BuildTarget.Switch && texture.m_PlatformBlob.Length != 0)
             return SwizzleType.Switch;
         return SwizzleType.None;
