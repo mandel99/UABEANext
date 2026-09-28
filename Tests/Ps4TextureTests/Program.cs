@@ -185,7 +185,7 @@ Test("platform routing uses PS4 + preprocessing, without requiring a blob", () =
     Check(TexturePlatform.GetSwizzleType(tex,38)==SwizzleType.Switch,"Switch retained");
 });
 
-foreach(var format in new[]{TextureFormat.Alpha8,TextureFormat.R8,TextureFormat.RGBA32,TextureFormat.ARGB32,TextureFormat.BGRA32})
+foreach(var format in new[]{TextureFormat.Alpha8,TextureFormat.R8,TextureFormat.RGBA32,TextureFormat.ARGB32,TextureFormat.BGRA32,TextureFormat.RGB24})
 Test($"integrated {format} odd-size export/import is byte exact", () =>
 {
     var tex=Texture(35,19,format);
@@ -254,5 +254,18 @@ Test("invalid preprocessing conversion leaves data and metadata intact", () =>
     tex.m_MipCount = 2;
     Reject<NotSupportedException>(() => TexturePlatform.SetPreprocessed(tex, 31, true));
     Check(ReferenceEquals(tex.pictureData, original) && !tex.m_IsPreProcessed && tex.m_StreamData.path == "original.resS", "failed conversion mutated texture");
+});
+Test("PS4 RGB24 preprocessing expands storage and disabling writes honest RGBA32 metadata", () =>
+{
+ var tex=Texture(13,9,TextureFormat.RGB24);
+ var source=new byte[13*9*3];new Random(7).NextBytes(source);tex.pictureData=source;
+ TexturePlatform.SetPreprocessed(tex,31,true);
+ Check(tex.m_TextureFormat==3 && tex.pictureData.Length==16*16*4,"preprocessed RGB24 storage");
+ TexturePlatform.SetPreprocessed(tex,31,false);
+ Check(tex.m_TextureFormat==(int)TextureFormat.RGBA32,"linear format must match four-byte storage");
+ for(int i=0;i<13*9;i++){
+  Check(tex.pictureData.AsSpan(i*4,3).SequenceEqual(source.AsSpan(i*3,3)),"RGB values");
+  Check(tex.pictureData[i*4+3]==255,"expanded alpha");
+ }
 });
 Console.WriteLine($"{passed} tests passed.");

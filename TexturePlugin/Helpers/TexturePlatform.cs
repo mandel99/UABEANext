@@ -19,8 +19,22 @@ public static class TexturePlatform
         if (isSwitch && enabled && texture.m_PlatformBlob.Length != 0)
             throw new NotSupportedException("Switch texture already has platform metadata despite a false preprocessing flag; its storage is ambiguous.");
         if (isSwitch && !enabled) format = SwitchSwizzle.GetCorrectedSwitchTextureFormat(format);
+        if (!isSwitch && !enabled) format = Ps4MortonLayout.GetStorageFormat(format);
         var layout = new Ps4MortonLayout(texture.m_Width, texture.m_Height, format);
         byte[] source = texture.pictureData ?? throw new InvalidDataException("Load the complete texture data before conversion.");
+        if (!isSwitch && enabled && format == TextureFormat.RGB24)
+        {
+            int pixels = checked(texture.m_Width * texture.m_Height);
+            if (source.Length != checked(pixels * 3))
+                throw new InvalidDataException("Linear RGB24 must contain three bytes per pixel.");
+            var rgba = new byte[checked(pixels * 4)];
+            for (int i = 0; i < pixels; i++)
+            {
+                Buffer.BlockCopy(source, i * 3, rgba, i * 4, 3);
+                rgba[i * 4 + 3] = 255;
+            }
+            source = rgba;
+        }
         byte[] result;
         byte[] blob = texture.m_PlatformBlob;
         if (!isSwitch)

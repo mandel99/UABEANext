@@ -21,10 +21,15 @@ The block size comes from `m_TextureFormat`, not from PNG dimensions:
 | --- | --- | ---: |
 | Alpha8, R8 | 1x1 pixel | 1 |
 | RGBA32, ARGB32, BGRA32 | 1x1 pixel | 4 |
+| RGB24 with PS4 preprocessing | 1x1 pixel (RGBA32 storage) | 4 |
 | DXT1 / BC4 | 4x4 pixels | 8 |
 | DXT3 / DXT5 / BC5 / BC6H / BC7 | 4x4 pixels | 16 |
 
 The flag is a routing condition, not proof of every possible PS4 layout.
+PS4 RGB24 preprocessing expands pixels to RGBA32 while retaining format 3
+in metadata. Decoding/import account for that storage format; ordinary
+non-preprocessed RGB24 remains three bytes per pixel. Disabling preprocessing
+on expanded RGB24 writes RGBA32 metadata to match its linear bytes.
 This implementation supports row-major 8x8 Morton microtiles only. AMD
 macrotiles, alternate pitches, arrays and volumes are not implemented.
 Unsupported formats and truncated buffers fail explicitly.
@@ -74,6 +79,14 @@ BC formats require the native compressor and can be lossy. BC6H PNG export
 does not preserve HDR precision.
 
 ## Validation
+
+An additional PS4 game asset set contained 107 preprocessed RGB24 textures.
+All used four-byte pixel storage and passed byte-exact PNG export/import
+roundtrips, including original padding. A 1024x684 BC1 texture had the full
+360448-byte padded buffer: detiling and retiling while retaining padding
+was byte-exact, including after asset save/reload. Its previously missing
+7680 decoded pixels were recovered from the original data. BC image
+recompression is still lossy; this exact BC test rearranges encoded blocks.
 
 A user-supplied Unity 2020.3.48f1 PS4 bundle contained a 2048x2048 Alpha8
 SDF atlas, one mip, `m_IsPreProcessed=true`, an empty platform blob and

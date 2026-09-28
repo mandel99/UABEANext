@@ -376,6 +376,8 @@ public class TextureLoader
             // Decode stored order directly on this temporary TextureFile only.
             if (texture.swizzleType == SwizzleType.Switch)
                 texture.m_TextureFormat = (int)SwitchSwizzle.GetCorrectedSwitchTextureFormat(format);
+            if (texture.swizzleType == SwizzleType.PS4)
+                texture.m_TextureFormat = (int)Ps4MortonLayout.GetStorageFormat(format);
             texture.swizzleType = SwizzleType.None;
         }
 
