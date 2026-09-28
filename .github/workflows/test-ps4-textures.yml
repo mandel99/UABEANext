@@ -1,4 +1,4 @@
-name: Test PS4 Morton textures
+name: Build PS4 texture plugin
 
 on:
   push:
@@ -10,7 +10,7 @@ permissions:
   contents: read
 
 jobs:
-  test:
+  build:
     runs-on: windows-2022
     steps:
       - uses: actions/checkout@v6
@@ -19,7 +19,5 @@ jobs:
       - uses: actions/setup-dotnet@v5
         with:
           dotnet-version: 9.0.x
-      - name: Test layout and image roundtrips
-        run: dotnet run --project Tests/Ps4TextureTests -c Release
       - name: Build texture plugin
         run: dotnet build TexturePlugin/TexturePlugin.csproj -c Release

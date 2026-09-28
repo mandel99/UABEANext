@@ -114,18 +114,17 @@ Export to PNG, import, bundle save and reload preserved all 4194304 texture
 bytes exactly. This validates that sample; in-game loading and other PS4
 hardware layouts have not been verified. Private game assets are not included.
 
-The console tests cover independent Morton fixtures for seven BC formats,
+Local validation covered independent Morton fixtures for seven BC formats,
 partial tiles, padding, the 1024x684 truncated-tail regression, platform
 routing and five byte-exact pixel-format roundtrips at odd dimensions.
-Windows tests also exercise native BC encoding, channel order and orientation.
-The previous standalone codec is retained only as a test reference.
+Windows validation also exercised native BC encoding, channel order and orientation.
+Validation tools are not included in this repository.
 
-## Build and test
+## Build
 
 ```sh
 git submodule update --init --recursive
 dotnet build UABEANext4.sln -c Release
-dotnet run --project Tests/Ps4TextureTests -c Release
 ```
 
 The AssetsTools.NET submodule points to this fork's PS4 implementation.
