@@ -65,15 +65,23 @@ Audit of the supplied PPSA03596 asset set, including three bundles:
   logical addresses. All 484 nonempty textures exported without exceptions.
 - All 10 preprocessed RGB24 records passed structural decoding and raw roundtrip.
 - Contact sheets were inspected for all nonempty records, plus mip previews.
-  Six records in sharedassets5.assets remain visually suspect: Circle,
-  RadialMenuRamp, UI_Btn_ChatWheel, stick-arrow, platformIcons and blackBlurCircle.
-  Their exact original content/layout is not established. A separate stick-arrow
-  copy in the maps bundle decodes correctly with the same dimensions, format and
-  mip count. Its logical base contains 304 opaque white pixels, while the entire
-  suspect stick-arrow buffer contains only 227 such aligned RGBA elements.
-  A permutation of that buffer therefore cannot reproduce the bundle copy.
-  A successful raw roundtrip is not proof of visual correctness;
-  these six must not be described as fully reconstructed.
+  Follow-up inspection resolved the suspicious sharedassets5 textures, including
+  Circle, buttonIcons_Xbox, killstab and KillAnimations1: the supplied .resS file
+  starts with two identical 65,536-byte blocks. Its length is 12,230,656 bytes,
+  whereas the final declared texture range ends at 12,165,120. Reading every
+  texture at its declared offset plus 65,536 bytes restores coherent images.
+  Removing one duplicate prefix block in a separate recovery copy leaves the
+  original asset metadata valid. All 17 textures then export, roundtrip exactly
+  with their original padding, and reload through the normal resource reader.
+  All five logical stick-arrow mip levels match the independent maps-bundle copy
+  byte for byte; their unused padding differs. Other examined loose texture
+  resource files end exactly at their last declared texture range.
+  The source of the duplicated block is unknown. This is a supplied resource-file
+  offset inconsistency, not an extra GPU swizzle rule or evidence of lost pixels.
+  The earlier claim that these images remained unresolved is superseded.
+  No automatic offset heuristic was added: extra file bytes alone do not prove
+  that arbitrary resource offsets should be shifted. A successful raw roundtrip
+  alone remains insufficient proof of visual correctness.
 - 17 real image imports covered RGB24, RGBA32, BC3, BC7 and mip chains. Padding,
   metadata and preprocessing conversions were checked; three written asset
   files reloaded with identical imported data. Original files were not modified.
