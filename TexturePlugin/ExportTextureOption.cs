@@ -102,7 +102,7 @@ public class ExportTextureOption : IUavPluginOption
 
                 try
                 {
-                    WriteTextureImage(texFile, asset, Path.Combine(dir, filePath), exportType);
+                    WriteTextureImage(workspace, texFile, asset, Path.Combine(dir, filePath), exportType);
                 }
                 catch (Exception ex)
                 {
@@ -194,7 +194,7 @@ public class ExportTextureOption : IUavPluginOption
 
         try
         {
-            WriteTextureImage(texFile, asset, filePath, exportType);
+            WriteTextureImage(workspace, texFile, asset, filePath, exportType);
         }
         catch (Exception ex)
         {
@@ -244,11 +244,11 @@ public class ExportTextureOption : IUavPluginOption
         return true;
     }
 
-    private static void WriteTextureImage(TextureFile texture, AssetInst asset, string path, ImageExportType type)
+    private static void WriteTextureImage(Workspace workspace, TextureFile texture, AssetInst asset, string path, ImageExportType type)
     {
         // Validate/decode before opening an existing destination for replacement.
         using var output = new MemoryStream();
-        byte[]? data = Ps5ResourceCompatibility.FillPictureData(texture, asset.FileInstance);
+        byte[]? data = Ps5ResourceCompatibility.FillPictureData(texture, asset.FileInstance, workspace.Manager);
         if (!texture.DecodeTextureImage(data, output, type))
             throw new InvalidDataException("Failed to decode texture (missing resS or unsupported format).");
         File.WriteAllBytes(path, output.ToArray());

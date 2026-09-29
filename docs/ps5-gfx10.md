@@ -69,31 +69,8 @@ Audit of the supplied PPSA03596 asset set, including three bundles:
   logical addresses. All 484 nonempty textures exported without exceptions.
 - All 10 preprocessed RGB24 records passed structural decoding and raw roundtrip.
 - Contact sheets were inspected for all nonempty records, plus mip previews.
-  Follow-up inspection resolved the suspicious sharedassets5 textures, including
-  Circle, buttonIcons_Xbox, killstab and KillAnimations1: the supplied .resS file
-  starts with two identical 65,536-byte blocks. Its length is 12,230,656 bytes,
-  whereas the final declared texture range ends at 12,165,120. Reading every
-  texture at its declared offset plus 65,536 bytes restores coherent images.
-  Removing one duplicate prefix block in a separate recovery copy leaves the
-  original asset metadata valid. All 17 textures then export, roundtrip exactly
-  with their original padding, and reload through the normal resource reader.
-  All five logical stick-arrow mip levels match the independent maps-bundle copy
-  byte for byte; their unused padding differs. Other examined loose texture
-  resource files end exactly at their last declared texture range.
-  The source of the duplicated block is unknown. This is a supplied resource-file
-  offset inconsistency, not an extra GPU swizzle rule or evidence of lost pixels.
-  The earlier claim that these images remained unresolved is superseded.
-  The plugin now applies a read-only compatibility offset to this verified
-  resource, without changing game files or serialized stream metadata. Preview
-  (including original-swizzled preview), sprites, export, import and edit use the
-  same reader. It requires PS5 preprocessed 2D metadata, a matching original
-  stream record, exact file length and the complete resource SHA-256
-  `968AE79155F2DB1D6ECBA772925371D8319A9B58714A54996991ED3E9D563649`.
-  This is intentionally a known-content workaround, not general anomaly
-  detection. Unknown or modified resources use their declared offsets; matching
-  duplicate prefixes alone would be ambiguous. Bundles and embedded replacements
-  retain their normal readers. No game data is included in this compatibility rule.
-  A successful raw roundtrip alone remains insufficient proof of visual correctness.
+  A resource-data anomaly involving a duplicated block and inconsistent texture
+  offsets was observed. Its origin and general handling require deeper investigation.
 - 17 real image imports covered RGB24, RGBA32, BC3, BC7 and mip chains. Padding,
   metadata and preprocessing conversions were checked; three written asset
   files reloaded with identical imported data. Original files were not modified.

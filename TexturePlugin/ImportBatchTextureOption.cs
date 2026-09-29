@@ -96,7 +96,7 @@ public class ImportBatchTextureOption : IUavPluginOption
             {
                 // Keep original console padding available to the swizzler.
                 if (consolePreprocessed)
-                    Ps5ResourceCompatibility.FillPictureData(tex, asset.FileInstance);
+                    Ps5ResourceCompatibility.FillPictureData(tex, asset.FileInstance, workspace.Manager);
                 tex.EncodeTextureImage(info.ImportFile, mipCount: mipCount);
                 tex.WriteTo(baseField);
                 asset.UpdateAssetDataAndRow(workspace, baseField);

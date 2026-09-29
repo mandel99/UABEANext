@@ -122,7 +122,7 @@ public class TextureLoader
 
             TextureHelper.SwizzleOptIn(texture, textureAsset.FileInstance.file);
 
-            var encTextureData = Ps5ResourceCompatibility.FillPictureData(texture, textureAsset.FileInstance);
+            var encTextureData = Ps5ResourceCompatibility.FillPictureData(texture, textureAsset.FileInstance, workspace.Manager);
             var textureData = texture.DecodeTextureRaw(encTextureData);
             if (textureData == null)
             {
@@ -371,7 +371,7 @@ public class TextureLoader
 
         TextureHelper.SwizzleOptIn(texture, asset.FileInstance.file);
 
-        var encTextureData = Ps5ResourceCompatibility.FillPictureData(texture, asset.FileInstance);
+        var encTextureData = Ps5ResourceCompatibility.FillPictureData(texture, asset.FileInstance, workspace.Manager);
 
         if (showSwizzled)
         {
