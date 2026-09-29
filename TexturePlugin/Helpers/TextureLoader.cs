@@ -378,6 +378,8 @@ public class TextureLoader
                 texture.m_TextureFormat = (int)SwitchSwizzle.GetCorrectedSwitchTextureFormat(format);
             if (texture.swizzleType == SwizzleType.PS4)
                 texture.m_TextureFormat = (int)Ps4MortonLayout.GetStorageFormat(format);
+            if (texture.swizzleType == SwizzleType.PS5)
+                texture.m_TextureFormat = (int)Ps5GfxLayout.GetStorageFormat(format);
             texture.swizzleType = SwizzleType.None;
         }
 

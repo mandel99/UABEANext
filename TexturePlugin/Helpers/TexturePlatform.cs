@@ -23,8 +23,6 @@ public static class TexturePlatform
 
         if (isSwitch && (texture.m_MipCount != 1 || texture.m_MipMap))
             throw new NotSupportedException("Switch preprocessing conversion currently requires one mip.");
-        if (isPs5 && (texture.m_MipCount != 1 || texture.m_MipMap))
-            throw new NotSupportedException("PS5 preprocessing conversion currently requires one mip.");
         if (isSwitch && enabled && texture.m_PlatformBlob.Length != 0)
             throw new NotSupportedException("Switch texture already has platform metadata despite a false preprocessing flag; its storage is ambiguous.");
 
@@ -33,12 +31,17 @@ public static class TexturePlatform
         if (isPs4 && !enabled)
             format = Ps4MortonLayout.GetStorageFormat(format);
 
+        if (isPs5 && !enabled)
+            format = Ps5GfxLayout.GetStorageFormat(format);
+
         byte[] source = texture.pictureData ?? throw new InvalidDataException("Load the complete texture data before conversion.");
 
-        if (isPs4 && enabled && format == TextureFormat.RGB24)
+        if ((isPs4 || isPs5) && enabled && format == TextureFormat.RGB24)
         {
-            var rgbChain = new Ps4MipChain(texture.m_Width, texture.m_Height, format, texture.m_MipCount);
-            int pixels = rgbChain.LinearSize / 4;
+            int linearSize = isPs4
+                ? new Ps4MipChain(texture.m_Width, texture.m_Height, format, texture.m_MipCount).LinearSize
+                : new Ps5MipChain(texture.m_Width, texture.m_Height, format, texture.m_MipCount).LinearSize;
+            int pixels = linearSize / 4;
             if (source.Length != checked(pixels * 3))
                 throw new InvalidDataException("Linear RGB24 must contain three bytes per pixel.");
             var rgba = new byte[checked(pixels * 4)];
@@ -65,26 +68,13 @@ public static class TexturePlatform
         }
         else if (isPs5)
         {
-            if (enabled)
-            {
-                // New tiled data uses 4 KiB standard mode. Require it to be
-                // identifiable on reload without inventing platform metadata.
-                var layout = new Ps5GfxLayout(
-                    texture.m_Width, texture.m_Height, format, Ps5GfxLayout.TileMode4KB);
-                Ps5GfxLayout.InferTileMode(texture.m_Width, texture.m_Height, format, layout.TiledSize);
-                if (source.Length != layout.LinearSize)
-                    throw new InvalidDataException(
-                        $"Texture size does not match the supported PS5 linear layout (expected {layout.LinearSize}, got {source.Length}).");
-                result = layout.Swizzle(source);
-            }
-            else
-            {
-                int tileMode = Ps5GfxLayout.InferTileMode(
-                    texture.m_Width, texture.m_Height, format, source.Length);
-                var layout = new Ps5GfxLayout(texture.m_Width, texture.m_Height, format, tileMode);
-                result = layout.Deswizzle(source);
-            }
+            var chain = enabled
+                ? new Ps5MipChain(texture.m_Width, texture.m_Height, format, texture.m_MipCount)
+                : Ps5MipChain.ForUnity(texture.m_Width, texture.m_Height, format, texture.m_MipCount, source.Length);
+            result = enabled ? chain.Swizzle(chain.SplitLinear(source))
+                : TextureOperations.FlattenMips(chain.Deswizzle(source), out _);
         }
+
         else
         {
             var layout = new Ps4MortonLayout(texture.m_Width, texture.m_Height, format);
