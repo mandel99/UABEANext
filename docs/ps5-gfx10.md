@@ -79,9 +79,17 @@ Audit of the supplied PPSA03596 asset set, including three bundles:
   The source of the duplicated block is unknown. This is a supplied resource-file
   offset inconsistency, not an extra GPU swizzle rule or evidence of lost pixels.
   The earlier claim that these images remained unresolved is superseded.
-  No automatic offset heuristic was added: extra file bytes alone do not prove
-  that arbitrary resource offsets should be shifted. A successful raw roundtrip
-  alone remains insufficient proof of visual correctness.
+  The plugin now applies a read-only compatibility offset to this verified
+  resource, without changing game files or serialized stream metadata. Preview
+  (including original-swizzled preview), sprites, export, import and edit use the
+  same reader. It requires PS5 preprocessed 2D metadata, a matching original
+  stream record, exact file length and the complete resource SHA-256
+  `968AE79155F2DB1D6ECBA772925371D8319A9B58714A54996991ED3E9D563649`.
+  This is intentionally a known-content workaround, not general anomaly
+  detection. Unknown or modified resources use their declared offsets; matching
+  duplicate prefixes alone would be ambiguous. Bundles and embedded replacements
+  retain their normal readers. No game data is included in this compatibility rule.
+  A successful raw roundtrip alone remains insufficient proof of visual correctness.
 - 17 real image imports covered RGB24, RGBA32, BC3, BC7 and mip chains. Padding,
   metadata and preprocessing conversions were checked; three written asset
   files reloaded with identical imported data. Original files were not modified.

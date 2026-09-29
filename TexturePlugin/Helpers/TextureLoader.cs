@@ -1,4 +1,4 @@
-﻿using AssetsTools.NET;
+using AssetsTools.NET;
 using AssetsTools.NET.Extra;
 using AssetsTools.NET.Texture;
 using Avalonia;
@@ -122,7 +122,7 @@ public class TextureLoader
 
             TextureHelper.SwizzleOptIn(texture, textureAsset.FileInstance.file);
 
-            var encTextureData = texture.FillPictureData(textureAsset.FileInstance);
+            var encTextureData = Ps5ResourceCompatibility.FillPictureData(texture, textureAsset.FileInstance);
             var textureData = texture.DecodeTextureRaw(encTextureData);
             if (textureData == null)
             {
@@ -371,6 +371,8 @@ public class TextureLoader
 
         TextureHelper.SwizzleOptIn(texture, asset.FileInstance.file);
 
+        var encTextureData = Ps5ResourceCompatibility.FillPictureData(texture, asset.FileInstance);
+
         if (showSwizzled)
         {
             // Decode stored order directly on this temporary TextureFile only.
@@ -383,7 +385,6 @@ public class TextureLoader
             texture.swizzleType = SwizzleType.None;
         }
 
-        var encTextureData = texture.FillPictureData(asset.FileInstance);
         // rare, but sometimes we see large textures with 0 texture data size
         if (encTextureData is null || encTextureData.Length == 0 || (texture.m_Width == 0 && texture.m_Height == 0))
         {

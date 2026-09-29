@@ -1,4 +1,4 @@
-﻿using AssetsTools.NET.Extra;
+using AssetsTools.NET.Extra;
 using AssetsTools.NET.Texture;
 using Avalonia.Platform.Storage;
 using System.Text;
@@ -96,7 +96,7 @@ public class ImportBatchTextureOption : IUavPluginOption
             {
                 // Keep original console padding available to the swizzler.
                 if (consolePreprocessed)
-                    tex.FillPictureData(asset.FileInstance);
+                    Ps5ResourceCompatibility.FillPictureData(tex, asset.FileInstance);
                 tex.EncodeTextureImage(info.ImportFile, mipCount: mipCount);
                 tex.WriteTo(baseField);
                 asset.UpdateAssetDataAndRow(workspace, baseField);

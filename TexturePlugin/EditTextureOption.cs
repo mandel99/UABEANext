@@ -1,4 +1,4 @@
-﻿using AssetsTools.NET.Extra;
+using AssetsTools.NET.Extra;
 using AssetsTools.NET.Texture;
 using System.Text;
 using TexturePlugin.Helpers;
@@ -64,7 +64,7 @@ public class EditTextureOption : IUavPluginOption
                         || (editTexSettings.TextureFormat is not null && (int)editTexSettings.TextureFormat != tex.m_TextureFormat)
                         || (editTexSettings.UsingMips is not null && editTexSettings.UsingMips != tex.m_MipMap))
                         throw new NotSupportedException("Apply preprocessing conversion separately from image replacement, format or mip changes.");
-                    tex.FillPictureData(asset.FileInstance);
+                    Ps5ResourceCompatibility.FillPictureData(tex, asset.FileInstance);
                     TexturePlatform.SetPreprocessed(tex, asset.FileInstance.file.Metadata.TargetPlatform, preprocessed);
                 }
                 catch (Exception ex)
@@ -85,7 +85,7 @@ public class EditTextureOption : IUavPluginOption
 
                 // Load the complete external/inline source before encoding so the
                 // console swizzler can retain the original tiled padding bytes.
-                tex.FillPictureData(asset.FileInstance);
+                Ps5ResourceCompatibility.FillPictureData(tex, asset.FileInstance);
             }
 
             byte[]? texOrigDecBytes = null;
@@ -109,7 +109,7 @@ public class EditTextureOption : IUavPluginOption
                 if (needToReencode)
                 {
                     // decode the texture so we can reencode it in the next step
-                    var texOrigEncBytes = tex.FillPictureData(asset.FileInstance);
+                    var texOrigEncBytes = Ps5ResourceCompatibility.FillPictureData(tex, asset.FileInstance);
                     if (texOrigEncBytes is null)
                     {
                         errorBuilder.AppendLine($"[{errorAssetName}]: failed to decode for reencoding");

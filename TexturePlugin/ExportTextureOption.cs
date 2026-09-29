@@ -1,4 +1,4 @@
-﻿using AssetsTools.NET;
+using AssetsTools.NET;
 using AssetsTools.NET.Extra;
 using AssetsTools.NET.Texture;
 using Avalonia.Platform.Storage;
@@ -248,7 +248,7 @@ public class ExportTextureOption : IUavPluginOption
     {
         // Validate/decode before opening an existing destination for replacement.
         using var output = new MemoryStream();
-        byte[] data = texture.FillPictureData(asset.FileInstance);
+        byte[]? data = Ps5ResourceCompatibility.FillPictureData(texture, asset.FileInstance);
         if (!texture.DecodeTextureImage(data, output, type))
             throw new InvalidDataException("Failed to decode texture (missing resS or unsupported format).");
         File.WriteAllBytes(path, output.ToArray());
