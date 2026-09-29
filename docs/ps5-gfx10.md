@@ -12,6 +12,10 @@ preview corrects RGB24 storage to RGBA32 on its temporary texture object only.
 - Alpha8, R8, RGB24, RGBA32, ARGB32, BGRA32/BGRA32Old, DXT1/3/5 and
   BC4/5/6H/7 encoded elements. Image recompression also requires an encoder
   supporting the requested format.
+- Additional integer/half/float pixels and ETC/EAC, ATC and ASTC LDR blocks
+  support deswizzle/export and encoded conversion. See the
+  [extended format table and limitations](console-texture-formats.md);
+  their game-specific storage has not been validated with real console samples.
 - Unity PS5 RGB24 preprocessing uses four-byte RGBA storage in the examined
   assets. Image import retains serialized RGB24 while writing this storage
   representation. Disabling preprocessing writes honest RGBA32 metadata;

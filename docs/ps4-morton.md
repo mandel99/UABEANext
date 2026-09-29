@@ -26,6 +26,10 @@ The block size comes from `m_TextureFormat`, not from PNG dimensions:
 | DXT1 / BC4 | 4x4 pixels | 8 |
 | DXT3 / DXT5 / BC5 / BC6H / BC7 | 4x4 pixels | 16 |
 
+Additional integer/half/float pixels and ETC/EAC, ATC and ASTC LDR blocks are
+supported for deswizzle/export and encoded conversion; see the
+[extended format table and limitations](console-texture-formats.md).
+
 The flag is a routing condition, not proof of every possible PS4 layout.
 PS4 RGB24 preprocessing expands pixels to RGBA32 while retaining format 3
 in metadata. Decoding/import account for that storage format; ordinary
@@ -33,7 +37,7 @@ non-preprocessed RGB24 remains three bytes per pixel. Disabling preprocessing
 on expanded RGB24 writes RGBA32 metadata to match its linear bytes.
 This implementation supports row-major 8x8 Morton microtiles only. AMD
 macrotiles, alternate pitches, arrays and volumes are not implemented.
-Unsupported formats and truncated buffers fail explicitly.
+Formats without an implemented element layout and truncated buffers fail explicitly.
 
 ## Padding and orientation
 
