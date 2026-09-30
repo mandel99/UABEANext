@@ -5,6 +5,12 @@ assets with `m_IsPreProcessed = true` through the GFX10 standard-layout
 swizzler. A false flag uses ordinary linear decoding. The original-swizzled
 preview corrects RGB24 storage to RGBA32 on its temporary texture object only.
 
+For textures with stored mipmaps, expand **Mipmaps** below the main preview to
+see decoded lower levels with their indices and dimensions. Levels are read on
+demand from the complete chain, including the packed mip tail; they are never
+generated from the base image. The original-swizzled checkbox affects only the
+main preview. Collapsed/expanded state persists while switching selected assets.
+
 ## Supported scope
 
 - Non-streaming 2D textures with one image and complete mip chains.

@@ -5,6 +5,9 @@ using Avalonia.Media.Imaging;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using System;
+using System.Collections.Generic;
+using System.Collections.ObjectModel;
+using UABEANext4.Plugins;
 
 namespace UABEANext4.ViewModels.Tools;
 public partial class ImagePreviewViewModel : ViewModelBase
@@ -31,6 +34,40 @@ public partial class ImagePreviewViewModel : ViewModelBase
     private string? _previewError;
 
     private Func<bool, (Bitmap? Image, int Format, string? Error)>? _texturePreview;
+
+    public ObservableCollection<MipmapPreview> Mipmaps { get; } = new();
+    [ObservableProperty] private bool _hasMipmaps;
+    [ObservableProperty] private bool _showMipmaps;
+    [ObservableProperty] private string _mipmapHeader = "Mipmaps";
+    [ObservableProperty] private string? _mipmapError;
+    private Func<IReadOnlyList<MipmapPreview>>? _mipmapPreview;
+    private bool _mipmapsLoaded;
+
+    public void ConfigureMipmaps(int count, Func<IReadOnlyList<MipmapPreview>>? preview)
+    {
+        foreach (var mip in Mipmaps) mip.Dispose();
+        Mipmaps.Clear();
+        _mipmapsLoaded = false;
+        MipmapError = null;
+        _mipmapPreview = preview;
+        HasMipmaps = count > 1 && preview != null;
+        MipmapHeader = $"Mipmaps ({Math.Max(0, count - 1)} lower levels)";
+        LoadMipmaps();
+    }
+
+    partial void OnShowMipmapsChanged(bool value) => LoadMipmaps();
+
+    private void LoadMipmaps()
+    {
+        if (!HasMipmaps || !ShowMipmaps || _mipmapsLoaded || _mipmapPreview == null) return;
+        try
+        {
+            MipmapError = null;
+            foreach (var mip in _mipmapPreview()) Mipmaps.Add(mip);
+            _mipmapsLoaded = true;
+        }
+        catch (Exception ex) { MipmapError = ex.Message; }
+    }
 
     public void ConfigureTexturePreview(Func<bool, (Bitmap?, int, string?)>? preview)
     {

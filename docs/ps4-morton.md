@@ -72,7 +72,13 @@ padding is discarded when becoming linear and zero-filled when tiling again;
 visible encoded elements are preserved, but unused padding need not match.
 Legacy Switch detection by nonempty platform blob remains unchanged.
 
-Export/preview decode the top level; trailing mip data is not exported.
+Image export and the main preview decode the top level; trailing mip data is not exported.
+Textures declaring more than one level show a **Mipmaps** expander below the main
+preview. Expanding it reads the stored lower levels and displays their level
+numbers, dimensions and thumbnails; it does not generate replacement mipmaps.
+These thumbnails are always decoded, independently of the original-swizzled
+main-preview checkbox. PS4, PS5 and supported linear pixel/block chains are
+handled; unsupported layouts or incomplete chains report an error in the panel.
 PS4 import requires one non-streaming 2D image, unchanged dimensions,
 format and mip count, and exactly the expected padded chain size.
 Each mip has logical dimensions max(1, width >> level) and max(1, height >>
@@ -86,7 +92,7 @@ Importing an edited PNG regenerates all lower mips: managed pixel formats
 use a box filter in stored channel space; BC formats use the existing native
 encoder's mip generation and lossy compression. This does not reproduce an
 authored mip chain or provide gamma-aware/normal-map-specific filtering.
-PNG export/preview still show the top level only.
+PNG export still contains the top level only.
 
 Import retains padding bytes, preprocessing and platform metadata. The
 replacement is stored inline through the standard save workflow; original

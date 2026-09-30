@@ -8,7 +8,7 @@ using UABEANext4.Logic.Mesh;
 using UABEANext4.Plugins;
 
 namespace TexturePlugin;
-public class TexturePreviewer : IUavPluginPreviewer, IUavRawTexturePreviewer
+public class TexturePreviewer : IUavPluginPreviewer, IUavRawTexturePreviewer, IUavMipTexturePreviewer
 {
     public string Name => "Preview Texture2D";
     public string Description => "Preview Texture2Ds";
@@ -64,4 +64,41 @@ public class TexturePreviewer : IUavPluginPreviewer, IUavRawTexturePreviewer
         => throw new InvalidOperationException();
 
     public void Cleanup() { }
+
+    public int GetMipCount(Workspace workspace, AssetInst asset)
+    {
+        var field = TextureHelper.GetByteArrayTexture(workspace, asset);
+        return field == null ? 0 : TextureFile.ReadTextureFile(field).m_MipCount;
+    }
+
+    public IReadOnlyList<MipmapPreview> ExecuteMipmaps(Workspace workspace, AssetInst asset)
+    {
+        var field = TextureHelper.GetByteArrayTexture(workspace, asset)
+            ?? throw new InvalidDataException("Texture metadata is missing.");
+        var t = TextureFile.ReadTextureFile(field);
+        TextureHelper.SwizzleOptIn(t, asset.FileInstance.file);
+        var raw = Ps5ResourceCompatibility.FillPictureData(t, asset.FileInstance, workspace.Manager)
+            ?? throw new InvalidDataException("Texture data is missing.");
+        var result = new List<MipmapPreview>();
+        try
+        {
+            foreach (var mip in TextureMipDecoder.Decode(t, raw))
+            {
+                var bitmap = new WriteableBitmap(new Avalonia.PixelSize(mip.Width, mip.Height),
+                    new Avalonia.Vector(96, 96), Avalonia.Platform.PixelFormat.Bgra8888,
+                    Avalonia.Platform.AlphaFormat.Unpremul);
+                try
+                {
+                    using var buffer = bitmap.Lock();
+                    for (int y = 0; y < mip.Height; y++)
+                        System.Runtime.InteropServices.Marshal.Copy(mip.Pixels, y * mip.Width * 4,
+                            IntPtr.Add(buffer.Address, y * buffer.RowBytes), mip.Width * 4);
+                    result.Add(new MipmapPreview(mip.Level, bitmap));
+                }
+                catch { bitmap.Dispose(); throw; }
+            }
+            return result;
+        }
+        catch { foreach (var mip in result) mip.Dispose(); throw; }
+    }
 }
