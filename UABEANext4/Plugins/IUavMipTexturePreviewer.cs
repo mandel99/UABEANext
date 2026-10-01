@@ -5,7 +5,6 @@ using UABEANext4.AssetWorkspace;
 
 namespace UABEANext4.Plugins;
 
-// Optional capability; other image preview plugins remain unchanged.
 public interface IUavMipTexturePreviewer
 {
     int GetMipCount(Workspace workspace, AssetInst asset);

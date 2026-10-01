@@ -127,7 +127,7 @@
 
                 <Label Grid.Row="12" Grid.Column="0">Is preprocessed</Label>
                 <CheckBox Grid.Row="12" Grid.Column="1" IsChecked="{Binding IsPreProcessed}" IsThreeState="{Binding IsPreProcessedThreeOn}"
-                          ToolTip.Tip="Convert between linear and console-swizzled storage (PS4 mip chains; Switch single mip)." />
+                          ToolTip.Tip="Convert texture storage for PS4, PS5 or Switch. Switch supports one mip." />
                 <Button Grid.Row="12" Grid.Column="2" Classes="reset" Command="{Binding ResetToDefault}" CommandParameter="12">
                     <PathIcon Data="{DynamicResource DockToolIconCloseGeometry}" />
                 </Button>

@@ -36,16 +36,21 @@ public partial class ImagePreviewViewModel : ViewModelBase
     private Func<bool, (Bitmap? Image, int Format, string? Error)>? _texturePreview;
 
     public ObservableCollection<MipmapPreview> Mipmaps { get; } = new();
-    [ObservableProperty] private bool _hasMipmaps;
-    [ObservableProperty] private bool _showMipmaps;
-    [ObservableProperty] private string _mipmapHeader = "Mipmaps";
-    [ObservableProperty] private string? _mipmapError;
+    [ObservableProperty]
+    private bool _hasMipmaps;
+    [ObservableProperty]
+    private bool _showMipmaps;
+    [ObservableProperty]
+    private string _mipmapHeader = "Mipmaps";
+    [ObservableProperty]
+    private string? _mipmapError;
     private Func<IReadOnlyList<MipmapPreview>>? _mipmapPreview;
     private bool _mipmapsLoaded;
 
     public void ConfigureMipmaps(int count, Func<IReadOnlyList<MipmapPreview>>? preview)
     {
-        foreach (var mip in Mipmaps) mip.Dispose();
+        foreach (var mip in Mipmaps)
+            mip.Dispose();
         Mipmaps.Clear();
         _mipmapsLoaded = false;
         MipmapError = null;
@@ -59,32 +64,38 @@ public partial class ImagePreviewViewModel : ViewModelBase
 
     private void LoadMipmaps()
     {
-        if (!HasMipmaps || !ShowMipmaps || _mipmapsLoaded || _mipmapPreview == null) return;
+        if (!HasMipmaps || !ShowMipmaps || _mipmapsLoaded || _mipmapPreview == null)
+            return;
         try
         {
             MipmapError = null;
-            foreach (var mip in _mipmapPreview()) Mipmaps.Add(mip);
+            foreach (var mip in _mipmapPreview())
+                Mipmaps.Add(mip);
             _mipmapsLoaded = true;
         }
-        catch (Exception ex) { MipmapError = ex.Message; }
+        catch (Exception ex)
+        {
+            MipmapError = ex.Message;
+        }
     }
 
     public void ConfigureTexturePreview(Func<bool, (Bitmap?, int, string?)>? preview)
     {
         _texturePreview = null;
-        // Keep the user's display preference when switching assets, including
-        // selections that temporarily hide the swizzled-preview option.
+        // Keep the preview preference when switching textures.
         PreviewError = null;
         CanShowSwizzled = preview != null;
         _texturePreview = preview;
-        if (preview != null) ReloadTexturePreview();
+        if (preview != null)
+            ReloadTexturePreview();
     }
 
     partial void OnShowSwizzledChanged(bool value) => ReloadTexturePreview();
 
     private void ReloadTexturePreview()
     {
-        if (_texturePreview == null) return;
+        if (_texturePreview == null)
+            return;
         try
         {
             var (image, format, error) = _texturePreview(ShowSwizzled);

@@ -5,10 +5,11 @@ namespace TexturePlugin.Helpers;
 
 public static class TexturePlatform
 {
-    // Convert encoded elements directly: toggling must not recompress BC data.
+    // Rearrange the stored data without recompressing it.
     public static void SetPreprocessed(TextureFile texture, uint platform, bool enabled)
     {
-        if (texture.m_IsPreProcessed == enabled) return;
+        if (texture.m_IsPreProcessed == enabled)
+            return;
 
         bool isPs4 = platform == (uint)BuildTarget.PS4;
         bool isPs5 = platform == (uint)BuildTarget.PS5;
@@ -24,7 +25,7 @@ public static class TexturePlatform
         if (isSwitch && (texture.m_MipCount != 1 || texture.m_MipMap))
             throw new NotSupportedException("Switch preprocessing conversion currently requires one mip.");
         if (isSwitch && enabled && texture.m_PlatformBlob.Length != 0)
-            throw new NotSupportedException("Switch texture already has platform metadata despite a false preprocessing flag; its storage is ambiguous.");
+            throw new NotSupportedException("Switch texture already has platform metadata despite a false preprocessing flag. The storage layout is unclear.");
 
         if (isSwitch && !enabled)
             format = SwitchSwizzle.GetCorrectedSwitchTextureFormat(format);
@@ -58,7 +59,9 @@ public static class TexturePlatform
 
         if (isPs4)
         {
-            var chain = new Ps4MipChain(texture.m_Width, texture.m_Height, format, texture.m_MipCount);
+            var chain = enabled
+                ? new Ps4MipChain(texture.m_Width, texture.m_Height, format, texture.m_MipCount)
+                : Ps4MipChain.ForUnity(texture.m_Width, texture.m_Height, format, texture.m_MipCount, source.Length);
             int expected = enabled ? chain.LinearSize : chain.TiledSize;
             if (source.Length != expected)
                 throw new InvalidDataException("Texture size does not match the supported PS4 layout.");
@@ -74,12 +77,12 @@ public static class TexturePlatform
             result = enabled ? chain.Swizzle(chain.SplitLinear(source))
                 : TextureOperations.FlattenMips(chain.Deswizzle(source), out _);
         }
-
         else
         {
             var layout = new Ps4MortonLayout(texture.m_Width, texture.m_Height, format);
             var block = SwitchSwizzle.GetTextureFormatBlockSize(format);
-            if (block.IsEmpty) throw new NotSupportedException("Unsupported Switch format.");
+            if (block.IsEmpty)
+                throw new NotSupportedException("Unsupported Switch format.");
             if (!enabled && (blob == null || blob.Length < 12))
                 throw new InvalidDataException("Switch platform metadata is missing.");
 
@@ -114,7 +117,7 @@ public static class TexturePlatform
             }
         }
 
-        // Commit only after every validation and conversion has succeeded.
+        // Update the texture after conversion succeeds.
         texture.pictureData = result;
         texture.m_CompleteImageSize = result.Length;
         texture.m_StreamData.path = "";

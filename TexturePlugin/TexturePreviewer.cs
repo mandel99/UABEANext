@@ -1,4 +1,4 @@
-﻿using AssetsTools.NET.Extra;
+using AssetsTools.NET.Extra;
 using AssetsTools.NET.Texture;
 using AssetsTools.NET.Texture.TextureDecoders.CrnUnity;
 using Avalonia.Media.Imaging;
@@ -28,7 +28,8 @@ public class TexturePreviewer : IUavPluginPreviewer, IUavRawTexturePreviewer, IU
     public bool SupportsRawPreview(Workspace workspace, AssetInst asset)
     {
         var field = TextureHelper.GetByteArrayTexture(workspace, asset);
-        if (field == null) return false;
+        if (field == null)
+            return false;
         var texture = TextureFile.ReadTextureFile(field);
         return TexturePlatform.GetSwizzleType(texture, asset.FileInstance.file.Metadata.TargetPlatform) != SwizzleType.None;
     }
@@ -63,7 +64,9 @@ public class TexturePreviewer : IUavPluginPreviewer, IUavRawTexturePreviewer, IU
     public string? ExecuteText(Workspace workspace, IUavPluginFunctions funcs, AssetInst selection, out string? error)
         => throw new InvalidOperationException();
 
-    public void Cleanup() { }
+    public void Cleanup()
+    {
+    }
 
     public int GetMipCount(Workspace workspace, AssetInst asset)
     {
@@ -75,14 +78,14 @@ public class TexturePreviewer : IUavPluginPreviewer, IUavRawTexturePreviewer, IU
     {
         var field = TextureHelper.GetByteArrayTexture(workspace, asset)
             ?? throw new InvalidDataException("Texture metadata is missing.");
-        var t = TextureFile.ReadTextureFile(field);
-        TextureHelper.SwizzleOptIn(t, asset.FileInstance.file);
-        var raw = Ps5ResourceCompatibility.FillPictureData(t, asset.FileInstance, workspace.Manager)
+        var texture = TextureFile.ReadTextureFile(field);
+        TextureHelper.SwizzleOptIn(texture, asset.FileInstance.file);
+        var raw = TextureHelper.FillPictureData(texture, asset.FileInstance, workspace.Manager)
             ?? throw new InvalidDataException("Texture data is missing.");
         var result = new List<MipmapPreview>();
         try
         {
-            foreach (var mip in TextureMipDecoder.Decode(t, raw))
+            foreach (var mip in TextureMipDecoder.Decode(texture, raw))
             {
                 var bitmap = new WriteableBitmap(new Avalonia.PixelSize(mip.Width, mip.Height),
                     new Avalonia.Vector(96, 96), Avalonia.Platform.PixelFormat.Bgra8888,
@@ -95,10 +98,19 @@ public class TexturePreviewer : IUavPluginPreviewer, IUavRawTexturePreviewer, IU
                             IntPtr.Add(buffer.Address, y * buffer.RowBytes), mip.Width * 4);
                     result.Add(new MipmapPreview(mip.Level, bitmap));
                 }
-                catch { bitmap.Dispose(); throw; }
+                catch
+                {
+                    bitmap.Dispose();
+                    throw;
+                }
             }
             return result;
         }
-        catch { foreach (var mip in result) mip.Dispose(); throw; }
+        catch
+        {
+            foreach (var mip in result)
+                mip.Dispose();
+            throw;
+        }
     }
 }

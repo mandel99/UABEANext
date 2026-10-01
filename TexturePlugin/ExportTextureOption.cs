@@ -246,9 +246,9 @@ public class ExportTextureOption : IUavPluginOption
 
     private static void WriteTextureImage(Workspace workspace, TextureFile texture, AssetInst asset, string path, ImageExportType type)
     {
-        // Validate/decode before opening an existing destination for replacement.
+        // Decode first so a failed export leaves the existing file alone.
         using var output = new MemoryStream();
-        byte[]? data = Ps5ResourceCompatibility.FillPictureData(texture, asset.FileInstance, workspace.Manager);
+        byte[]? data = TextureHelper.FillPictureData(texture, asset.FileInstance, workspace.Manager);
         if (!texture.DecodeTextureImage(data, output, type))
             throw new InvalidDataException("Failed to decode texture (missing resS or unsupported format).");
         File.WriteAllBytes(path, output.ToArray());
