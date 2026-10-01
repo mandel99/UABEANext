@@ -12,11 +12,11 @@ public class EditTextureOption : IUavPluginOption
 {
     public string Name => "Edit Texture2D";
     public string Description => "Edits Texture2D settings";
-    public UavPluginMode Options => UavPluginMode.Export;
+    public UavPluginMode Options => UavPluginMode.Edit;
 
     public bool SupportsSelection(Workspace workspace, UavPluginMode mode, IList<AssetInst> selection)
     {
-        if (mode != UavPluginMode.Export)
+        if (mode != UavPluginMode.Edit)
         {
             return false;
         }

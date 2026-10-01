@@ -23,7 +23,6 @@ public partial class AssetDocumentView : UserControl
     {
         if (DataContext is AssetDocumentViewModel docVm)
         {
-            docVm.ShowPluginsContextMenuAction += ShowPluginsContextMenu;
             docVm.SetSelectedItemsAction += SetSelectedItems;
         }
     }
@@ -62,9 +61,10 @@ public partial class AssetDocumentView : UserControl
         }
     }
 
-    private void ShowPluginsContextMenu()
+    private void ActionFlyout_Opening(object? sender, EventArgs e)
     {
-        FlyoutBase.ShowAttachedFlyout(showPluginsBtn);
+        if (DataContext is AssetDocumentViewModel vm)
+            vm.CreateActionMenus();
     }
 
     // necessary since SelectedItems isn't bindable

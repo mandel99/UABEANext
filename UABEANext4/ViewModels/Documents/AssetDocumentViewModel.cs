@@ -51,8 +51,10 @@ public partial class AssetDocumentViewModel : Document
     private DataGridCollectionView _collectionView = new(new List<object>());
     [ObservableProperty]
     private string _searchText = "";
-    [ObservableProperty]
-    private ObservableCollection<PluginItemInfo> _pluginsItems = [];
+
+    public ObservableCollection<MenuOptionViewModel> ExportItems { get; } = [];
+    public ObservableCollection<MenuOptionViewModel> ImportItems { get; } = [];
+    public ObservableCollection<MenuOptionViewModel> EditItems { get; } = [];
 
     [ObservableProperty]
     private bool _isSearchCaseSensitive = false;
@@ -65,7 +67,6 @@ public partial class AssetDocumentViewModel : Document
     [ObservableProperty]
     private bool _isBusy;
 
-    public event Action? ShowPluginsContextMenuAction;
     public event Action<List<AssetInst>>? SetSelectedItemsAction;
 
     private List<TypeFilterTypeEntry>? _filterTypes = null;
@@ -382,19 +383,19 @@ public partial class AssetDocumentViewModel : Document
     }
 
     [RelayCommand]
-    public async Task Import()
+    public async Task Import(SelectedDumpType format)
     {
         if (SelectedItems.Count > 1)
         {
-            await ImportBatch(SelectedItems.ToList());
+            await ImportBatch(SelectedItems.ToList(), format);
         }
         else if (SelectedItems.Count == 1)
         {
-            await ImportSingle(SelectedItems.First());
+            await ImportSingle(SelectedItems.First(), format);
         }
     }
 
-    public async Task ImportBatch(List<AssetInst> assets)
+    public async Task ImportBatch(List<AssetInst> assets, SelectedDumpType format)
     {
         var storageProvider = StorageService.GetStorageProvider();
         if (storageProvider is null)
@@ -410,7 +411,7 @@ public partial class AssetDocumentViewModel : Document
         if (folders == null || folders.Length != 1)
             return;
 
-        var exts = new List<string> { "json", "txt", "dat" };
+        var exts = new List<string> { GetDumpExtension(format) };
         var dialogService = Ioc.Default.GetRequiredService<IDialogService>();
 
         var batchInfos = await dialogService.ShowDialog(new BatchImportViewModel(Workspace, assets, folders[0], exts));
@@ -441,12 +442,12 @@ public partial class AssetDocumentViewModel : Document
                     byte[]? data;
                     string? exceptionMessage;
 
-                    if (selectedFilePath.EndsWith(".json"))
+                    if (format == SelectedDumpType.JsonDump)
                     {
                         var tempField = Workspace.GetTemplateField(selectedAsset);
                         data = importer.ImportJsonAsset(tempField, out exceptionMessage);
                     }
-                    else if (selectedFilePath.EndsWith(".txt"))
+                    else if (format == SelectedDumpType.TxtDump)
                     {
                         data = importer.ImportTextAsset(out exceptionMessage);
                     }
@@ -492,7 +493,7 @@ public partial class AssetDocumentViewModel : Document
         }
     }
 
-    public async Task ImportSingle(AssetInst asset)
+    public async Task ImportSingle(AssetInst asset, SelectedDumpType format)
     {
         var storageProvider = StorageService.GetStorageProvider();
         if (storageProvider is null)
@@ -502,13 +503,7 @@ public partial class AssetDocumentViewModel : Document
         {
             Title = "Choose file to import",
             AllowMultiple = false,
-            FileTypeFilter = new[]
-            {
-            new FilePickerFileType("UABEA json dump (*.json)") { Patterns = new[] { "*.json" } },
-            new FilePickerFileType("UABE txt dump (*.txt)") { Patterns = new[] { "*.txt" } },
-            new FilePickerFileType("Raw dump (*.dat)") { Patterns = new[] { "*.dat" } },
-            new FilePickerFileType("All files (*.*)") { Patterns = new[] { "*" } },
-        },
+            FileTypeFilter = new[] { GetDumpFileType(format) },
         });
 
         var files = FileDialogUtils.GetOpenFileDialogFiles(result);
@@ -531,12 +526,12 @@ public partial class AssetDocumentViewModel : Document
                 byte[]? data = null;
                 string? exception = null;
 
-                if (file.EndsWith(".json"))
+                if (format == SelectedDumpType.JsonDump)
                 {
                     var baseField = Workspace.GetTemplateField(asset);
                     data = importer.ImportJsonAsset(baseField, out exception);
                 }
-                else if (file.EndsWith(".txt"))
+                else if (format == SelectedDumpType.TxtDump)
                 {
                     data = importer.ImportTextAsset(out exception);
                 }
@@ -575,7 +570,7 @@ public partial class AssetDocumentViewModel : Document
     }
 
     [RelayCommand]
-    public async Task Export()
+    public async Task Export(SelectedDumpType format)
     {
         var storageProvider = StorageService.GetStorageProvider();
         if (storageProvider is null)
@@ -589,22 +584,7 @@ public partial class AssetDocumentViewModel : Document
 
         if (SelectedItems.Count > 1)
         {
-            var dialogService = Ioc.Default.GetRequiredService<IDialogService>();
-            var exportType = await dialogService.ShowDialog(new SelectDumpViewModel(true));
-            if (exportType == null)
-            {
-                return;
-            }
-
-            await Task.Yield();
-
-            var exportExt = exportType switch
-            {
-                SelectedDumpType.JsonDump => ".json",
-                SelectedDumpType.TxtDump => ".txt",
-                SelectedDumpType.RawDump => ".dat",
-                _ => ".dat"
-            };
+            var exportExt = "." + GetDumpExtension(format);
 
             var result = await storageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
             {
@@ -634,13 +614,8 @@ public partial class AssetDocumentViewModel : Document
             var result = await storageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
             {
                 Title = "Choose file to export",
-                FileTypeChoices = new[]
-                {
-                    new FilePickerFileType("UABEA json dump (*.json)") { Patterns = new[] { "*.json" } },
-                    new FilePickerFileType("UABE txt dump (*.txt)") { Patterns = new[] { "*.txt" } },
-                    new FilePickerFileType("Raw dump (*.dat)") { Patterns = new[] { "*.dat" } }
-                },
-                DefaultExtension = "json",
+                FileTypeChoices = new[] { GetDumpFileType(format) },
+                DefaultExtension = GetDumpExtension(format),
                 SuggestedFileName = exportFileName
             });
 
@@ -668,7 +643,7 @@ public partial class AssetDocumentViewModel : Document
                     using var fs = File.Open(file, FileMode.Create, FileAccess.Write, FileShare.None);
                     var exporter = new AssetExport(fs);
 
-                    if (file.EndsWith(".json") || file.EndsWith(".txt"))
+                    if (format is SelectedDumpType.JsonDump or SelectedDumpType.TxtDump)
                     {
                         var baseField = Workspace.GetBaseField(asset);
                         if (baseField == null)
@@ -680,7 +655,7 @@ public partial class AssetDocumentViewModel : Document
                         {
                             try
                             {
-                                if (file.EndsWith(".json"))
+                                if (format == SelectedDumpType.JsonDump)
                                     exporter.DumpJsonAsset(baseField);
                                 else
                                     exporter.DumpTextAsset(baseField);
@@ -691,7 +666,7 @@ public partial class AssetDocumentViewModel : Document
                             }
                         }
                     }
-                    else if (file.EndsWith(".dat"))
+                    else if (format == SelectedDumpType.RawDump)
                     {
                         if (asset.IsReplacerPreviewable)
                         {
@@ -723,37 +698,92 @@ public partial class AssetDocumentViewModel : Document
         }
     }
 
-    public void ShowPlugins()
+    private static string GetDumpExtension(SelectedDumpType format) => format switch
     {
+        SelectedDumpType.JsonDump => "json",
+        SelectedDumpType.TxtDump => "txt",
+        SelectedDumpType.RawDump => "dat",
+        _ => throw new ArgumentOutOfRangeException(nameof(format))
+    };
+
+    private static string GetDumpLabel(SelectedDumpType format) => format switch
+    {
+        SelectedDumpType.JsonDump => "JSON (UABEA dump)",
+        SelectedDumpType.TxtDump => "TXT (UABE dump)",
+        SelectedDumpType.RawDump => "DAT (raw data)",
+        _ => throw new ArgumentOutOfRangeException(nameof(format))
+    };
+
+    private static FilePickerFileType GetDumpFileType(SelectedDumpType format) =>
+        new(GetDumpLabel(format)) { Patterns = new[] { "*." + GetDumpExtension(format) } };
+
+    public void CreateActionMenus()
+    {
+        ExportItems.Clear();
+        ImportItems.Clear();
+        EditItems.Clear();
         if (SelectedItems.Count == 0)
         {
-            PluginsItems.Clear();
-            PluginsItems.Add(new PluginItemInfo("No assets selected", null, this));
+            foreach (var items in new[] { ExportItems, ImportItems, EditItems })
+                items.Add(new MenuOptionViewModel("No assets selected", new RelayCommand(() => { }, () => false)));
             return;
         }
 
-        var pluginTypes = UavPluginMode.Export | UavPluginMode.Import;
-        var pluginsList = Workspace.Plugins.GetOptionsThatSupport(Workspace, SelectedItems, pluginTypes);
-        if (pluginsList == null)
+        foreach (var format in new[] { SelectedDumpType.JsonDump, SelectedDumpType.TxtDump, SelectedDumpType.RawDump })
         {
-            return;
+            ExportItems.Add(new MenuOptionViewModel(GetDumpLabel(format), new AsyncRelayCommand(() => Export(format))));
+            ImportItems.Add(new MenuOptionViewModel(GetDumpLabel(format), new AsyncRelayCommand(() => Import(format))));
         }
+        EditItems.Add(new MenuOptionViewModel("JSON (asset data)", new RelayCommand(EditDump)));
 
-        if (pluginsList.Count == 0)
+        var plugins = Workspace.Plugins.GetOptionsThatSupport(Workspace, SelectedItems,
+            UavPluginMode.Export | UavPluginMode.Import | UavPluginMode.Edit);
+        foreach (var plugin in plugins)
         {
-            PluginsItems.Clear();
-            PluginsItems.Add(new PluginItemInfo("No plugins available", null, this));
-        }
-        else
-        {
-            PluginsItems.Clear();
-            foreach (var plugin in pluginsList)
+            var items = plugin.Mode switch
             {
-                PluginsItems.Add(new PluginItemInfo(plugin.Option.Name, plugin.Option, this));
+                UavPluginMode.Export => ExportItems,
+                UavPluginMode.Import => ImportItems,
+                _ => EditItems
+            };
+            if (plugin.Option is IUavPluginFormatOption formatOption)
+            {
+                foreach (var extension in formatOption.Extensions)
+                    items.Add(new MenuOptionViewModel(extension.ToUpperInvariant() + " (image)",
+                        new AsyncRelayCommand(() => ExecutePlugin(plugin, extension))));
+            }
+            else
+            {
+                items.Add(new MenuOptionViewModel(plugin.Option.Name,
+                    new AsyncRelayCommand(() => ExecutePlugin(plugin))));
             }
         }
+    }
 
-        ShowPluginsContextMenuAction?.Invoke();
+    private async Task ExecutePlugin(PluginOptionModePair plugin, string? extension = null)
+    {
+        if (IsBusy || SelectedItems.Count == 0)
+            return;
+
+        var selection = SelectedItems.ToList();
+        try
+        {
+            IsBusy = true;
+            var funcs = new UavPluginFunctions();
+            var changed = extension != null && plugin.Option is IUavPluginFormatOption formatted
+                ? await formatted.ExecuteFormat(Workspace, funcs, plugin.Mode, selection, extension)
+                : await plugin.Option.Execute(Workspace, funcs, plugin.Mode, selection);
+            if (changed)
+                ResendSelectedAssetsSelected();
+        }
+        catch (Exception ex)
+        {
+            await MessageBoxUtil.ShowDialog("Asset operation error", ex.Message);
+        }
+        finally
+        {
+            IsBusy = false;
+        }
     }
 
     public void EditDump()
@@ -893,35 +923,10 @@ public partial class AssetDocumentViewModel : Document
         var selected = SelectedItems;
         var first = selected[0];
 
-        ContextMenuItems.Add(new MenuOptionViewModel("Edit Data",
-            new RelayCommand(EditDump), null, ApplicationExtensions.GetIconPath("action-view-info.png")));
-
-        ContextMenuItems.Add(new MenuOptionViewModel("-"));
-
-        var pluginsMenu = new MenuOptionViewModel("Plugins", null, null, ApplicationExtensions.GetIconPath("action-plugins.png"))
-        {
-            Items = new ObservableCollection<MenuOptionViewModel>()
-        };
-
-        var pluginTypes = UavPluginMode.Export | UavPluginMode.Import;
-        var pluginsList = Workspace.Plugins.GetOptionsThatSupport(Workspace, SelectedItems, pluginTypes);
-
-        if (pluginsList != null && pluginsList.Count > 0)
-        {
-            foreach (var plugin in pluginsList)
-            {
-                pluginsMenu.Items.Add(new MenuOptionViewModel(
-                    plugin.Option.Name,
-                    new RelayCommand(() => plugin.Option.Execute(Workspace, new UavPluginFunctions(), pluginTypes, SelectedItems))
-                ));
-            }
-        }
-        else
-        {
-            var disabledItem = new MenuOptionViewModel("No plugins available");
-            pluginsMenu.Items.Add(disabledItem);
-        }
-        ContextMenuItems.Add(pluginsMenu);
+        CreateActionMenus();
+        ContextMenuItems.Add(new MenuOptionViewModel("Export", iconPath: ApplicationExtensions.GetIconPath("action-export-asset.png")) { Items = ExportItems });
+        ContextMenuItems.Add(new MenuOptionViewModel("Import", iconPath: ApplicationExtensions.GetIconPath("action-import-asset.png")) { Items = ImportItems });
+        ContextMenuItems.Add(new MenuOptionViewModel("Edit Data", iconPath: ApplicationExtensions.GetIconPath("action-view-info.png")) { Items = EditItems });
         ContextMenuItems.Add(new MenuOptionViewModel("-"));
 
         var copyMenu = new MenuOptionViewModel("Copy");

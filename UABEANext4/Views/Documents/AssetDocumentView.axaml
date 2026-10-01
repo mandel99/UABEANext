@@ -5,7 +5,6 @@
              mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
              xmlns:docs="using:UABEANext4.ViewModels.Documents"
              xmlns:menu="using:UABEANext4.ViewModels.Menu"
-             xmlns:plugins="using:UABEANext4.Plugins"
              xmlns:uac="using:UABEANext4.Converters"
              xmlns:ws="using:UABEANext4.AssetWorkspace"
              x:Class="UABEANext4.Views.Documents.AssetDocumentView"
@@ -51,36 +50,52 @@
                         <TextBlock Text="View Scene" VerticalAlignment="Center"/>
                     </StackPanel>
                 </Button>
-                <Button Classes="toolbar" Command="{Binding Export}">
+                <Button Classes="toolbar">
                     <StackPanel Orientation="Horizontal">
                         <Image Source="avares://UABEANext4/Assets/Icons/action-export-asset.png" />
                         <TextBlock Text="Export" VerticalAlignment="Center"/>
+                        <TextBlock Text="▾" Margin="6,0,0,0" VerticalAlignment="Center"/>
                     </StackPanel>
+                    <Button.Flyout>
+                        <MenuFlyout ItemsSource="{Binding ExportItems}" Opening="ActionFlyout_Opening">
+                            <MenuFlyout.ItemContainerTheme>
+                                <ControlTheme TargetType="MenuItem" BasedOn="{StaticResource {x:Type MenuItem}}" x:DataType="menu:MenuOptionViewModel">
+                                    <Setter Property="Header" Value="{Binding Header}"/>
+                                    <Setter Property="Command" Value="{Binding Command}"/>
+                                </ControlTheme>
+                            </MenuFlyout.ItemContainerTheme>
+                        </MenuFlyout>
+                    </Button.Flyout>
                 </Button>
-                <Button Classes="toolbar" Command="{Binding Import}">
+                <Button Classes="toolbar">
                     <StackPanel Orientation="Horizontal">
                         <Image Source="avares://UABEANext4/Assets/Icons/action-import-asset.png" />
                         <TextBlock Text="Import" VerticalAlignment="Center"/>
+                        <TextBlock Text="▾" Margin="6,0,0,0" VerticalAlignment="Center"/>
                     </StackPanel>
+                    <Button.Flyout>
+                        <MenuFlyout ItemsSource="{Binding ImportItems}" Opening="ActionFlyout_Opening">
+                            <MenuFlyout.ItemContainerTheme>
+                                <ControlTheme TargetType="MenuItem" BasedOn="{StaticResource {x:Type MenuItem}}" x:DataType="menu:MenuOptionViewModel">
+                                    <Setter Property="Header" Value="{Binding Header}"/>
+                                    <Setter Property="Command" Value="{Binding Command}"/>
+                                </ControlTheme>
+                            </MenuFlyout.ItemContainerTheme>
+                        </MenuFlyout>
+                    </Button.Flyout>
                 </Button>
-                <Button Classes="toolbar" Command="{Binding EditDump}">
+                <Button Classes="toolbar">
                     <StackPanel Orientation="Horizontal">
                         <Image Source="avares://UABEANext4/Assets/Icons/action-view-info.png" />
                         <TextBlock Text="Edit Data" VerticalAlignment="Center"/>
-                    </StackPanel>
-                </Button>
-                <Button Classes="toolbar" Command="{Binding ShowPlugins}" Name="showPluginsBtn">
-                    <StackPanel Orientation="Horizontal">
-                        <Image Source="avares://UABEANext4/Assets/Icons/action-plugins.png" />
-                        <TextBlock Text="Plugins" VerticalAlignment="Center"/>
+                        <TextBlock Text="▾" Margin="6,0,0,0" VerticalAlignment="Center"/>
                     </StackPanel>
                     <Button.Flyout>
-                        <MenuFlyout ItemsSource="{Binding PluginsItems}">
+                        <MenuFlyout ItemsSource="{Binding EditItems}" Opening="ActionFlyout_Opening">
                             <MenuFlyout.ItemContainerTheme>
-                                <ControlTheme TargetType="MenuItem" BasedOn="{StaticResource {x:Type MenuItem}}" x:DataType="plugins:PluginItemInfo">
-                                    <Setter Property="Header" Value="{Binding Name}"/>
-                                    <Setter Property="Command" Value="{Binding Execute}"/>
-                                    <Setter Property="CommandParameter" Value="{Binding $parent[UserControl].((docs:AssetDocumentViewModel)DataContext).SelectedItems}"/>
+                                <ControlTheme TargetType="MenuItem" BasedOn="{StaticResource {x:Type MenuItem}}" x:DataType="menu:MenuOptionViewModel">
+                                    <Setter Property="Header" Value="{Binding Header}"/>
+                                    <Setter Property="Command" Value="{Binding Command}"/>
                                 </ControlTheme>
                             </MenuFlyout.ItemContainerTheme>
                         </MenuFlyout>

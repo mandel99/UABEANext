@@ -9,7 +9,7 @@ using UABEANext4.ViewModels.Dialogs;
 
 namespace TexturePlugin;
 
-public class ImportBatchTextureOption : IUavPluginOption
+public class ImportBatchTextureOption : IUavPluginFormatOption
 {
     public string Name => "Import Texture2D";
 
@@ -28,12 +28,53 @@ public class ImportBatchTextureOption : IUavPluginOption
         return selection.All(a => a.TypeId == typeId);
     }
 
-    public async Task<bool> Execute(Workspace workspace, IUavPluginFunctions funcs, UavPluginMode mode, IList<AssetInst> selection)
+    public IReadOnlyList<string> Extensions { get; } = ["png", "tga", "bmp", "jpg"];
+
+    public Task<bool> Execute(Workspace workspace, IUavPluginFunctions funcs, UavPluginMode mode, IList<AssetInst> selection)
     {
-        return await BatchImport(workspace, funcs, selection);
+        return Import(workspace, funcs, selection, null);
     }
 
-    public async Task<bool> BatchImport(Workspace workspace, IUavPluginFunctions funcs, IList<AssetInst> selection)
+    public Task<bool> ExecuteFormat(Workspace workspace, IUavPluginFunctions funcs,
+        UavPluginMode mode, IList<AssetInst> selection, string extension)
+    {
+        return Import(workspace, funcs, selection, extension);
+    }
+
+    private async Task<bool> Import(Workspace workspace, IUavPluginFunctions funcs,
+        IList<AssetInst> selection, string? extension)
+    {
+        if (selection.Count != 1)
+            return await BatchImport(workspace, funcs, selection, extension);
+
+        var extensions = GetExtensions(extension);
+        var paths = await funcs.ShowOpenFileDialog(new FilePickerOpenOptions
+        {
+            Title = "Import texture image",
+            AllowMultiple = false,
+            FileTypeFilter = [new FilePickerFileType("Texture image")
+                { Patterns = extensions.Select(ext => "*." + ext).ToArray() }]
+        });
+        if (paths.Length == 0)
+            return false;
+
+        var asset = selection[0];
+        var info = new ImportBatchInfo(asset, asset.FileName, asset.DisplayName, asset.PathId)
+        {
+            ImportFile = paths[0]
+        };
+        return await ImportTextures(workspace, funcs, [info]);
+    }
+
+    private static List<string> GetExtensions(string? extension) => extension switch
+    {
+        null => ["bmp", "png", "jpg", "jpeg", "tga"],
+        "jpg" => ["jpg", "jpeg"],
+        _ => [extension]
+    };
+
+    public async Task<bool> BatchImport(Workspace workspace, IUavPluginFunctions funcs,
+        IList<AssetInst> selection, string? extension = null)
     {
         var dir = await funcs.ShowOpenFolderDialog(new FolderPickerOpenOptions()
         {
@@ -45,7 +86,7 @@ public class ImportBatchTextureOption : IUavPluginOption
             return false;
         }
 
-        var extensions = new List<string>() { "bmp", "png", "jpg", "jpeg", "tga" };
+        var extensions = GetExtensions(extension);
         var batchInfosViewModel = new BatchImportViewModel(workspace, selection.ToList(), dir, extensions);
         if (batchInfosViewModel.DataGridItems.Count == 0)
         {

@@ -12,7 +12,7 @@ using UABEANext4.Util;
 
 namespace TexturePlugin;
 
-public class ExportTextureOption : IUavPluginOption
+public class ExportTextureOption : IUavPluginFormatOption
 {
     public string Name => "Export Texture2D/Sprite";
     public string Description => "Exports Texture2D/Sprites to png/tga/bmp/jpg";
@@ -42,21 +42,35 @@ public class ExportTextureOption : IUavPluginOption
         }
     }
 
-    public async Task<bool> BatchExport(Workspace workspace, IUavPluginFunctions funcs, IList<AssetInst> selection)
+    public IReadOnlyList<string> Extensions { get; } = ["png", "tga", "bmp", "jpg"];
+
+    public Task<bool> ExecuteFormat(Workspace workspace, IUavPluginFunctions funcs,
+        UavPluginMode mode, IList<AssetInst> selection, string extension)
     {
-        ExportBatchOptionsViewModel dialog = new ExportBatchOptionsViewModel();
-        ExportBatchOptionsResult? optionsRes = await funcs.ShowDialog(dialog);
+        return selection.Count > 1
+            ? BatchExport(workspace, funcs, selection, extension)
+            : SingleExport(workspace, funcs, selection, extension);
+    }
 
-        // bug fix for double dialog box freezing in windows
-        await Task.Yield();
-
-        if (optionsRes == null)
+    public async Task<bool> BatchExport(Workspace workspace, IUavPluginFunctions funcs, IList<AssetInst> selection, string? extension = null)
+    {
+        string fileExtension;
+        ImageExportType exportType;
+        if (extension != null)
         {
-            return false;
+            fileExtension = "." + extension;
+            exportType = ExportTypeFromFileName(fileExtension);
         }
-
-        string fileExtension = optionsRes.Value.Extension;
-        ImageExportType exportType = optionsRes.Value.ImageType;
+        else
+        {
+            var optionsRes = await funcs.ShowDialog(new ExportBatchOptionsViewModel());
+            // Yield between dialogs on Windows.
+            await Task.Yield();
+            if (optionsRes == null)
+                return false;
+            fileExtension = optionsRes.Value.Extension;
+            exportType = optionsRes.Value.ImageType;
+        }
 
         var dir = await funcs.ShowOpenFolderDialog(new FolderPickerOpenOptions()
         {
@@ -154,18 +168,18 @@ public class ExportTextureOption : IUavPluginOption
         return true;
     }
 
-    public Task<bool> SingleExport(Workspace workspace, IUavPluginFunctions funcs, IList<AssetInst> selection)
+    public Task<bool> SingleExport(Workspace workspace, IUavPluginFunctions funcs, IList<AssetInst> selection, string? extension = null)
     {
         AssetInst asset = selection[0];
         if (asset.Type == AssetClassID.Texture2D)
-            return SingleExportTexture2D(workspace, funcs, asset);
+            return SingleExportTexture2D(workspace, funcs, asset, extension);
         else if (asset.Type == AssetClassID.Sprite)
-            return SingleExportTextureSprite(workspace, funcs, asset);
+            return SingleExportTextureSprite(workspace, funcs, asset, extension);
         else
             return Task.FromResult(false);
     }
 
-    private async Task<bool> SingleExportTexture2D(Workspace workspace, IUavPluginFunctions funcs, AssetInst asset)
+    private async Task<bool> SingleExportTexture2D(Workspace workspace, IUavPluginFunctions funcs, AssetInst asset, string? extension)
     {
         AssetTypeValueField? texBaseField = TextureHelper.GetByteArrayTexture(workspace, asset);
         if (texBaseField == null)
@@ -184,13 +198,13 @@ public class ExportTextureOption : IUavPluginOption
         }
 
         string assetName = PathUtils.ReplaceInvalidPathChars(asset.AssetName ?? "Texture2D");
-        var filePath = await ShowImageSaveFileDialog(funcs, asset, assetName);
+        var filePath = await ShowImageSaveFileDialog(funcs, asset, assetName, extension);
         if (filePath == null)
         {
             return false;
         }
 
-        ImageExportType exportType = ExportTypeFromFileName(filePath);
+        ImageExportType exportType = ExportTypeFromFileName(extension == null ? filePath : "." + extension);
 
         try
         {
@@ -206,18 +220,18 @@ public class ExportTextureOption : IUavPluginOption
         return true;
     }
 
-    private async Task<bool> SingleExportTextureSprite(Workspace workspace, IUavPluginFunctions funcs, AssetInst asset)
+    private async Task<bool> SingleExportTextureSprite(Workspace workspace, IUavPluginFunctions funcs, AssetInst asset, string? extension)
     {
         bool fullCrop = ConfigurationManager.Settings.FullCropSprites;
 
         string assetName = PathUtils.ReplaceInvalidPathChars(asset.AssetName ?? "Sprite");
-        var filePath = await ShowImageSaveFileDialog(funcs, asset, assetName);
+        var filePath = await ShowImageSaveFileDialog(funcs, asset, assetName, extension);
         if (filePath == null)
         {
             return false;
         }
 
-        ImageExportType exportType = ExportTypeFromFileName(filePath);
+        ImageExportType exportType = ExportTypeFromFileName(extension == null ? filePath : "." + extension);
         string errorAssetName = $"{Path.GetFileName(asset.FileInstance.path)}/{asset.PathId}";
 
         TextureLoader texLoader = new TextureLoader();
@@ -254,13 +268,15 @@ public class ExportTextureOption : IUavPluginOption
         File.WriteAllBytes(path, output.ToArray());
     }
 
-    private static Task<string?> ShowImageSaveFileDialog(IUavPluginFunctions funcs, AssetInst asset, string assetName)
+    private static Task<string?> ShowImageSaveFileDialog(IUavPluginFunctions funcs, AssetInst asset, string assetName, string? extension)
     {
         bool exportJustNames = ConfigurationManager.Settings.ExportImportJustNames;
         return funcs.ShowSaveFileDialog(new FilePickerSaveOptions()
         {
             Title = "Save texture",
-            FileTypeChoices =
+            FileTypeChoices = extension != null
+                ? new FilePickerFileType[] { new(extension.ToUpperInvariant() + " image") { Patterns = ["*." + extension] } }
+                :
             [
                 new("PNG file") { Patterns = ["*.png"] },
                 new("BMP file") { Patterns = ["*.bmp"] },
@@ -268,13 +284,13 @@ public class ExportTextureOption : IUavPluginOption
                 new("TGA file") { Patterns = ["*.tga"] },
             ],
             SuggestedFileName = AssetNamer.GetAssetFileName(asset, assetName, string.Empty, exportJustNames),
-            DefaultExtension = "png"
+            DefaultExtension = extension ?? "png"
         });
     }
 
     private static ImageExportType ExportTypeFromFileName(string fileName)
     {
-        return Path.GetExtension(fileName) switch
+        return Path.GetExtension(fileName).ToLowerInvariant() switch
         {
             ".bmp" => ImageExportType.Bmp,
             ".png" => ImageExportType.Png,

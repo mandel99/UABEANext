@@ -9,5 +9,6 @@ public enum UavPluginMode
     Export = 2,
     Console = 4,
     Create = 8,
-    All = 15
+    Edit = 16,
+    All = Import | Export | Console | Create | Edit
 }
